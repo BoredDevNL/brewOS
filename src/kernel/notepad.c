@@ -3,58 +3,68 @@
 #include <stddef.h>
 
 Window win_notepad;
-static int notepad_scroll_line = 0;  // Track which line is at top of visible area
+static int notepad_scroll_line = 0;  
 
 static void notepad_ensure_cursor_visible(Window *win) {
-    // Calculate how many lines fit in the notepad window (allow 3-4 extra lines)
-    int visible_lines = (win->h - 40) / 10 + 3;  // Content area height / line height + buffer
+    int visible_lines = (win->h - 40) / 10 + 3; 
     if (visible_lines < 1) visible_lines = 1;
     
-    // Count which line the cursor is on
     int cursor_line = 0;
     for (int i = 0; i < win->cursor_pos && i < win->buf_len; i++) {
         if (win->buffer[i] == '\n') cursor_line++;
     }
     
-    // Scroll up if cursor is above visible area
     if (cursor_line < notepad_scroll_line) {
         notepad_scroll_line = cursor_line;
     }
     
-    // Scroll down if cursor is below visible area
     if (cursor_line >= notepad_scroll_line + visible_lines) {
         notepad_scroll_line = cursor_line - visible_lines + 1;
     }
 }
 
 static void notepad_paint(Window *win) {
-    // Draw text starting from scroll position
-    int display_line = 0;
-    int current_line = 0;
+    int visual_line = 0; 
     int current_x = win->x + 8;
     int current_y = win->y + 30;
+    int window_right = win->x + win->w - 16;  
     
     for (int i = 0; i < win->buf_len; i++) {
-        // Skip lines before scroll position
-        if (current_line < notepad_scroll_line) {
+        if (visual_line < notepad_scroll_line) {
             if (win->buffer[i] == '\n') {
-                current_line++;
+                visual_line++;
+                current_x = win->x + 8;
+                current_y = win->y + 30;
+            } else {
+                if (current_x >= window_right) {
+                    visual_line++;
+                    current_x = win->x + 8;
+                    current_y += 10;
+                }
+                current_x += 8;
             }
             continue;
         }
         
-        // Stop if we've gone past visible area
-        if (display_line >= (win->h - 40) / 10) {
+        if (visual_line >= notepad_scroll_line + (win->h - 40) / 10) {
             break;
         }
         
         if (win->buffer[i] == '\n') {
             current_x = win->x + 8;
             current_y += 10;
-            current_line++;
-            display_line++;
+            visual_line++;
         } else {
-            // Draw single character
+            if (current_x >= window_right) {
+                current_x = win->x + 8;
+                current_y += 10;
+                visual_line++;
+                
+                if (visual_line >= notepad_scroll_line + (win->h - 40) / 10) {
+                    break;
+                }
+            }
+            
             char ch[2] = {win->buffer[i], 0};
             draw_string(current_x, current_y, ch, COLOR_BLACK);
             current_x += 8;
@@ -65,21 +75,26 @@ static void notepad_paint(Window *win) {
     if (win->focused) {
         int cx = win->x + 8;
         int cy = win->y + 30;
-        int current_line = 0;
+        int visual_line = 0;
+        int window_right = win->x + win->w - 16;  // Right boundary with padding
         
         for (int i = 0; i < win->cursor_pos; i++) {
             if (win->buffer[i] == '\n') {
                 cx = win->x + 8;
                 cy += 10;
-                current_line++;
+                visual_line++;
             } else {
+                if (cx >= window_right) {
+                    cx = win->x + 8;
+                    cy += 10;
+                    visual_line++;
+                }
                 cx += 8;
             }
         }
         
-        // Only draw cursor if it's in visible area
-        if (current_line >= notepad_scroll_line && 
-            current_line < notepad_scroll_line + (win->h - 40) / 10) {
+        if (visual_line >= notepad_scroll_line && 
+            visual_line < notepad_scroll_line + (win->h - 40) / 10) {
             draw_rect(cx, cy, 2, 8, COLOR_BLACK);
         }
     }
