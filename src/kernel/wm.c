@@ -262,7 +262,7 @@ void wm_paint(void) {
     draw_rect(0, sh - 28, sw, 2, COLOR_WHITE); // Top highlight
     
     // 5. Start Button
-    draw_button(2, sh - 26, 60, 24, "Start", start_menu_open);
+    draw_button(2, sh - 26, 60, 24, "BrewOS", start_menu_open);
     
     // Clock
     draw_clock(sw - 80, sh - 20);
