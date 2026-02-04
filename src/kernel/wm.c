@@ -66,6 +66,40 @@ void draw_button(int x, int y, int w, int h, const char *text, bool pressed) {
     draw_string(tx, ty, text, COLOR_BLACK);
 }
 
+void draw_coffee_cup(int x, int y, int size) {
+    // Coffee cup icon - small retro style
+    int cup_w = size;
+    int cup_h = size - 2;
+    
+    // Cup body (tan/cream color)
+    draw_rect(x + 1, y + 2, cup_w - 2, cup_h - 3, COLOR_LTGRAY);
+    
+    // Cup outline
+    draw_rect(x + 1, y + 2, cup_w - 2, 1, COLOR_BLACK);  // Top
+    draw_rect(x + 1, y + 2, 1, cup_h - 3, COLOR_BLACK);  // Left
+    draw_rect(x + cup_w - 2, y + 2, 1, cup_h - 3, COLOR_BLACK);  // Right
+    draw_rect(x + 1, y + cup_h - 1, cup_w - 2, 1, COLOR_BLACK);  // Bottom
+    
+    // Rounded bottom corners
+    draw_rect(x + 1, y + cup_h - 1, 1, 1, COLOR_LTGRAY);
+    draw_rect(x + cup_w - 2, y + cup_h - 1, 1, 1, COLOR_LTGRAY);
+    
+    // Handle - much bigger (on the right side, pointing inward)
+    draw_rect(x + cup_w, y + 3, 2, 8, COLOR_BLACK);
+    draw_rect(x + cup_w - 2, y + 3, 2, 1, COLOR_BLACK);
+    draw_rect(x + cup_w - 2, y + 10, 2, 1, COLOR_BLACK);
+    
+    // Coffee liquid inside - rainbow Apple logo stripes (blue, green, yellow, red, purple, blue)
+    int stripe_height = (cup_h - 5) / 6;
+    int coffee_y = y + 4;
+    draw_rect(x + 2, coffee_y, cup_w - 4, stripe_height, COLOR_APPLE_BLUE);
+    draw_rect(x + 2, coffee_y + stripe_height, cup_w - 4, stripe_height, COLOR_APPLE_GREEN);
+    draw_rect(x + 2, coffee_y + stripe_height * 2, cup_w - 4, stripe_height, COLOR_APPLE_YELLOW);
+    draw_rect(x + 2, coffee_y + stripe_height * 3, cup_w - 4, stripe_height, COLOR_APPLE_RED);
+    draw_rect(x + 2, coffee_y + stripe_height * 4, cup_w - 4, stripe_height, COLOR_APPLE_VIOLET);
+    draw_rect(x + 2, coffee_y + stripe_height * 5, cup_w - 4, stripe_height, COLOR_APPLE_BLUE);
+}
+
 void draw_icon(int x, int y, const char *label) {
     // Simple "File" Icon
     draw_rect(x + 10, y, 20, 25, COLOR_WHITE);
@@ -261,8 +295,12 @@ void wm_paint(void) {
     draw_rect(0, sh - 28, sw, 28, COLOR_GRAY);
     draw_rect(0, sh - 28, sw, 2, COLOR_WHITE); // Top highlight
     
-    // 5. Start Button
-    draw_button(2, sh - 26, 60, 24, "BrewOS", start_menu_open);
+    // 5. Start Button with Coffee Cup Icon
+    draw_bevel_rect(2, sh - 26, 90, 24, start_menu_open);
+    // Draw coffee cup icon on the button
+    draw_coffee_cup(5, sh - 24, 20);
+    // Draw BrewOS text with extra spacing on the left
+    draw_string(35, sh - 18, "BrewOS", COLOR_BLACK);
     
     // Clock
     draw_clock(sw - 80, sh - 20);

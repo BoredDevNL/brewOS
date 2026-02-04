@@ -3,7 +3,7 @@
 #include "font.h"
 
 static struct limine_framebuffer *g_fb = NULL;
-static uint32_t g_bg_color = 0xFF6B4423;  // Coffee color by default
+static uint32_t g_bg_color = 0xFF696969;  // Dark gray background
 
 // Dirty rectangle tracking
 static DirtyRect g_dirty = {0, 0, 0, 0, false};
