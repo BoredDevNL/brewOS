@@ -335,21 +335,28 @@ static void explorer_paint(Window *win) {
         // Draw icon (larger area)
         explorer_draw_file_icon(item_x + 5, item_y + 5, items[i].is_directory);
         
-        // Draw name below icon
+        // Draw name below icon with text wrapping
         uint32_t text_color = (i == selected_item) ? COLOR_WHITE : COLOR_BLACK;
         int name_len = explorer_strlen(items[i].name);
         int text_x = item_x + 5;
         int text_y = item_y + 50;
+        int max_name_width = EXPLORER_ITEM_WIDTH - 10;  // 110 pixels available for text
+        int chars_per_line = max_name_width / 8;  // 8 pixels per character
         
-        // Truncate name if too long
-        char display_name[24];
-        int copy_len = name_len > 18 ? 18 : name_len;
-        for (int j = 0; j < copy_len; j++) {
-            display_name[j] = items[i].name[j];
+        // Draw wrapped filename
+        int line_offset = 0;
+        char line_buffer[25];
+        for (int j = 0; j < name_len; j++) {
+            int pos_in_line = j % chars_per_line;
+            line_buffer[pos_in_line] = items[i].name[j];
+            line_buffer[pos_in_line + 1] = 0;
+            
+            // Draw line when we reach end of line or end of name
+            if (pos_in_line == chars_per_line - 1 || j == name_len - 1) {
+                draw_string(text_x, text_y + (line_offset * 10), line_buffer, text_color);
+                line_offset++;
+            }
         }
-        display_name[copy_len] = 0;
-        
-        draw_string(text_x, text_y, display_name, text_color);
     }
     
     // Draw dialogs

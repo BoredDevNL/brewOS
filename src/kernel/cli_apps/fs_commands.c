@@ -239,3 +239,39 @@ void cli_cmd_cat(char *args) {
     
     fat32_close(fh);
 }
+
+void cli_cmd_touch(char *args) {
+    if (!args || args[0] == 0) {
+        cli_write("Usage: touch <filename>\n");
+        return;
+    }
+    
+    char filename[256];
+    int i = 0;
+    while (args[i] && args[i] != ' ' && args[i] != '\t') {
+        filename[i] = args[i];
+        i++;
+    }
+    filename[i] = 0;
+    
+    // Check if file already exists
+    if (fat32_exists(filename)) {
+        cli_write("File already exists: ");
+        cli_write(filename);
+        cli_write("\n");
+        return;
+    }
+    
+    // Open file in write mode to create it
+    FAT32_FileHandle *fh = fat32_open(filename, "w");
+    if (!fh) {
+        cli_write("Error: Cannot create file\n");
+        return;
+    }
+    
+    fat32_close(fh);
+    
+    cli_write("Created: ");
+    cli_write(filename);
+    cli_write("\n");
+}

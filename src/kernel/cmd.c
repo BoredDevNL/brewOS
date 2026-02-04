@@ -14,8 +14,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define CMD_COLS 70
-#define CMD_ROWS 25
+#define CMD_COLS 116
+#define CMD_ROWS 41
 #define LINE_HEIGHT 10
 #define CHAR_WIDTH 8
 #define PROMPT "> "
@@ -108,6 +108,10 @@ static int pager_top_line = 0;
 
 // Boot time for uptime
 int boot_time_init = 0;
+
+// Output redirection state
+static FAT32_FileHandle *redirect_file = NULL;
+static char redirect_mode = 0;  // '>' for write, 'a' for append, 0 for normal output
 int boot_year, boot_month, boot_day, boot_hour, boot_min, boot_sec;
 
 // --- Helpers ---
@@ -193,6 +197,12 @@ static void cmd_scroll_up() {
 
 // Public for CLI apps to use
 void cmd_putchar(char c) {
+    // If output is being redirected to a file, write there instead
+    if (redirect_file && redirect_mode) {
+        fat32_write(redirect_file, &c, 1);
+        return;
+    }
+    
     if (c == '\n') {
         cursor_col = 0;
         cursor_row++;
@@ -225,8 +235,14 @@ void cmd_putchar(char c) {
 
 // Public for CLI apps to use
 void cmd_write(const char *str) {
-    while (*str) {
-        cmd_putchar(*str++);
+    // If output is being redirected to a file, write there instead
+    if (redirect_file && redirect_mode) {
+        fat32_write(redirect_file, (void *)str, cmd_strlen(str));
+    } else {
+        // Normal output to screen
+        while (*str) {
+            cmd_putchar(*str++);
+        }
     }
 }
 
@@ -371,6 +387,8 @@ static const CommandEntry commands[] = {
     {"echo", cli_cmd_echo},
     {"CAT", cli_cmd_cat},
     {"cat", cli_cmd_cat},
+    {"TOUCH", cli_cmd_touch},
+    {"touch", cli_cmd_touch},
     // Memory Management Commands
     {"MEMINFO", cli_cmd_meminfo},
     {"meminfo", cli_cmd_meminfo},
@@ -390,7 +408,7 @@ static const CommandEntry commands[] = {
 // --- Dispatcher ---
 
 // Buffer for capturing command output
-static char pipe_buffer[4096];
+static char pipe_buffer[8192];
 static int pipe_buffer_pos = 0;
 
 static void pipe_capture_write(const char *str) {
@@ -425,42 +443,73 @@ static void cmd_exec_single(char *cmd) {
     cmd_write("\n");
 }
 
-// Execute command with pipe support
+// Execute command with redirection and pipe support
 static void cmd_exec(char *cmd) {
-    // Check for pipe operator
-    char *pipe_ptr = NULL;
+    // Check for redirection operators (> or >>)
+    char *redirect_ptr = NULL;
+    char redirect_op = 0;  // '>' or 'a' for append
+    char output_file[256] = {0};
+    int cmd_len = 0;
+    
     for (int i = 0; cmd[i]; i++) {
-        if (cmd[i] == '|' && (i == 0 || cmd[i-1] != '>' && cmd[i+1] != '>' )) {
-            pipe_ptr = &cmd[i];
+        if (cmd[i] == '>' && cmd[i+1] == '>') {
+            redirect_ptr = cmd + i + 2;
+            redirect_op = 'a';  // append
+            cmd_len = i;
+            break;
+        } else if (cmd[i] == '>') {
+            redirect_ptr = cmd + i + 1;
+            redirect_op = '>';  // write
+            cmd_len = i;
             break;
         }
     }
     
-    if (!pipe_ptr) {
-        // No pipe - execute normally
-        cmd_exec_single(cmd);
-        return;
+    // If redirection found, set it up
+    if (redirect_ptr) {
+        // Null terminate command
+        cmd[cmd_len] = 0;
+        
+        // Parse output filename
+        int i = 0;
+        while (redirect_ptr[i] && (redirect_ptr[i] == ' ' || redirect_ptr[i] == '\t')) {
+            i++;
+        }
+        
+        int j = 0;
+        while (redirect_ptr[i] && redirect_ptr[i] != ' ' && redirect_ptr[i] != '\t') {
+            output_file[j++] = redirect_ptr[i++];
+        }
+        output_file[j] = 0;
+        
+        if (!output_file[0]) {
+            cmd_write("Error: No output file specified\n");
+            return;
+        }
+        
+        // Open file for redirection
+        const char *mode = (redirect_op == 'a') ? "a" : "w";
+        redirect_file = fat32_open(output_file, mode);
+        if (!redirect_file) {
+            cmd_write("Error: Cannot open file for redirection\n");
+            return;
+        }
+        
+        redirect_mode = redirect_op;
     }
     
-    // Split into two commands
-    *pipe_ptr = 0;
-    char *second_cmd = pipe_ptr + 1;
-    
-    // Execute first command with output captured
-    pipe_buffer_pos = 0;
-    cmd_memset(pipe_buffer, 0, sizeof(pipe_buffer));
-    
-    FAT32_FileHandle *pipe_file = fat32_open("_pipe_temp.tmp", "w");
-    if (!pipe_file) {
-        cmd_write("Error: Cannot create pipe\n");
-        return;
-    }
-    
+    // Execute the command
     cmd_exec_single(cmd);
     
-    fat32_close(pipe_file);
-    
-    cmd_exec_single(second_cmd);
+    // Close redirected file if it was opened
+    if (redirect_file) {
+        fat32_close(redirect_file);
+        redirect_file = NULL;
+        redirect_mode = 0;
+        cmd_write("Output redirected to: ");
+        cmd_write(output_file);
+        cmd_write("\n");
+    }
 }
 
 

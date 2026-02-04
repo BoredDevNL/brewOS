@@ -160,7 +160,7 @@ static void minesweeper_paint(Window *win) {
     } else if (game_won) {
         draw_string(win->x + 10, win->y + 30, "You Won!", COLOR_BLUE);
     } else {
-        draw_string(win->x + 10, win->y + 30, "Minesweeper", COLOR_BLACK);
+        draw_string(win->x + 10, win->y + 30, "", COLOR_BLACK);
     }
     
     // Draw grid

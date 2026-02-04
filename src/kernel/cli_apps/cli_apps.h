@@ -27,6 +27,7 @@ void cli_cmd_mkdir(char *args);
 void cli_cmd_rm(char *args);
 void cli_cmd_echo(char *args);
 void cli_cmd_cat(char *args);
+void cli_cmd_touch(char *args);
 
 // Memory management commands
 void cli_cmd_meminfo(char *args);
