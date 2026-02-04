@@ -10,6 +10,7 @@ Window win_control_panel;
 #define COLOR_GREEN     0xFF008000
 #define COLOR_BLUE_BG   0xFF000080
 #define COLOR_PURPLE    0xFF800080
+#define COLOR_GREY      0xFF454545
 
 // Control panel state
 #define VIEW_MAIN 0
@@ -108,6 +109,10 @@ static void control_panel_paint_wallpaper(Window *win) {
     // Purple button
     draw_button(button_x + 100, button_y, 60, 20, "Purple", false);
     draw_rect(button_x + 165, button_y + 5, 20, 10, COLOR_PURPLE);
+    
+    // Grey button
+    draw_button(button_x + 200, button_y, 60, 20, "Grey", false);
+    draw_rect(button_x + 265, button_y + 5, 20, 10, COLOR_GREY);
     
     // Custom color section
     button_y += 40;
@@ -222,6 +227,12 @@ static void control_panel_handle_click(Window *win, int x, int y) {
         // Check Purple button
         if (x >= button_x + 100 && x < button_x + 160 && y >= button_y && y < button_y + 20) {
             graphics_set_bg_color(COLOR_PURPLE);
+            return;
+        }
+        
+        // Check Grey button
+        if (x >= button_x + 200 && x < button_x + 260 && y >= button_y && y < button_y + 20) {
+            graphics_set_bg_color(COLOR_GREY);
             return;
         }
         
