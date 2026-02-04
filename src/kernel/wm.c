@@ -348,7 +348,7 @@ void wm_handle_click(int x, int y) {
     int sh = get_screen_height();
     
     // Check Start Button
-    if (rect_contains(2, sh - 26, 60, 24, x, y)) {
+    if (rect_contains(2, sh - 26, 90, 24, x, y)) {
         start_menu_open = !start_menu_open;
         force_redraw = true;
         return;
