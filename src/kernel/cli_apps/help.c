@@ -15,5 +15,5 @@ void cli_cmd_help(char *args) {
     cli_write("  COWSAY   - cowsay <msg>\n");
     cli_write("  REBOOT   - Reboot system\n");
     cli_write("  SHUTDOWN - Shutdown system\n");
-    cli_write("  MEMINFO  - Gives memory info");
+    cli_write("  MEMINFO  - Gives memory info\n");
 }
