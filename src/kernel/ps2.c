@@ -1,6 +1,7 @@
 #include "ps2.h"
 #include "io.h"
 #include "wm.h"
+#include "network.h"
 #include <stdbool.h>
 
 extern void serial_print(const char *s);
@@ -9,6 +10,7 @@ extern void serial_print_hex(uint64_t n);
 // --- Timer Handler ---
 void timer_handler(void) {
     wm_timer_tick();
+    network_process_frames();
     outb(0x20, 0x20); // EOI to Master PIC
 }
 

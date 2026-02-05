@@ -37,4 +37,14 @@ void cli_cmd_memblock(char *args);
 void cli_cmd_memvalid(char *args);
 void cli_cmd_memtest(char *args);
 
+// Network commands
+void cli_cmd_netinit(char *args);
+void cli_cmd_netinfo(char *args);
+void cli_cmd_ipset(char *args);
+void cli_cmd_udpsend(char *args);
+void cli_cmd_udptest(char *args);
+
+// PCI commands
+void cli_cmd_pcilist(char *args);
+
 #endif

@@ -8,6 +8,7 @@
 #include "wm.h"
 #include "io.h"
 #include "memory_manager.h"
+#include "platform.h"
 
 // --- Limine Requests ---
 __attribute__((used, section(".requests")))
@@ -46,6 +47,7 @@ static void hcf(void) {
 
 // Kernel Entry Point
 void kmain(void) {
+    platform_init();
     // 1. Graphics Init
     if (LIMINE_BASE_REVISION_SUPPORTED == false) {
         // Warning

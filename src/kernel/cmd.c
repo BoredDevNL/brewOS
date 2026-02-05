@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "network.h"
 
 #define CMD_COLS 116
 #define CMD_ROWS 41
@@ -112,6 +113,9 @@ int boot_time_init = 0;
 // Output redirection state
 static FAT32_FileHandle *redirect_file = NULL;
 static char redirect_mode = 0;  // '>' for write, 'a' for append, 0 for normal output
+static bool pipe_capture_mode = false;
+static char pipe_buffer[8192];
+static int pipe_buffer_pos = 0;
 int boot_year, boot_month, boot_day, boot_hour, boot_min, boot_sec;
 
 // --- Helpers ---
@@ -197,6 +201,14 @@ static void cmd_scroll_up() {
 
 // Public for CLI apps to use
 void cmd_putchar(char c) {
+    // If pipe capture mode is enabled, write to pipe buffer
+    if (pipe_capture_mode) {
+        if (pipe_buffer_pos < (int)sizeof(pipe_buffer) - 1) {
+            pipe_buffer[pipe_buffer_pos++] = c;
+        }
+        return;
+    }
+    
     // If output is being redirected to a file, write there instead
     if (redirect_file && redirect_mode) {
         fat32_write(redirect_file, &c, 1);
@@ -235,6 +247,14 @@ void cmd_putchar(char c) {
 
 // Public for CLI apps to use
 void cmd_write(const char *str) {
+    // If pipe capture mode is enabled, write to pipe buffer
+    if (pipe_capture_mode) {
+        while (*str && pipe_buffer_pos < (int)sizeof(pipe_buffer) - 1) {
+            pipe_buffer[pipe_buffer_pos++] = *str++;
+        }
+        return;
+    }
+    
     // If output is being redirected to a file, write there instead
     if (redirect_file && redirect_mode) {
         fat32_write(redirect_file, (void *)str, cmd_strlen(str));
@@ -402,19 +422,33 @@ static const CommandEntry commands[] = {
     {"memvalid", cli_cmd_memvalid},
     {"MEMTEST", cli_cmd_memtest},
     {"memtest", cli_cmd_memtest},
+    // Network Commands
+    {"NETINIT", cli_cmd_netinit},
+    {"netinit", cli_cmd_netinit},
+    {"NETINFO", cli_cmd_netinfo},
+    {"netinfo", cli_cmd_netinfo},
+    {"IPSET", cli_cmd_ipset},
+    {"ipset", cli_cmd_ipset},
+    {"UDPSEND", cli_cmd_udpsend},
+    {"udpsend", cli_cmd_udpsend},
+    {"UDPTEST", cli_cmd_udptest},
+    {"udptest", cli_cmd_udptest},
+    {"PCILIST", cli_cmd_pcilist},
+    {"pcilist", cli_cmd_pcilist},
     {NULL, NULL}
 };
 
 // --- Dispatcher ---
 
-// Buffer for capturing command output
-static char pipe_buffer[8192];
-static int pipe_buffer_pos = 0;
-
-static void pipe_capture_write(const char *str) {
-    while (*str && pipe_buffer_pos < (int)sizeof(pipe_buffer) - 1) {
-        pipe_buffer[pipe_buffer_pos++] = *str++;
+// Find pipe operator in command string (||)
+static const char* find_pipe(const char* cmd) {
+    while (*cmd) {
+        if (*cmd == '|' && *(cmd + 1) == '|') {
+            return cmd;
+        }
+        cmd++;
     }
+    return NULL;
 }
 
 // Execute a single command
@@ -445,6 +479,160 @@ static void cmd_exec_single(char *cmd) {
 
 // Execute command with redirection and pipe support
 static void cmd_exec(char *cmd) {
+    // Check for pipe operator first
+    const char* pipe_pos = find_pipe(cmd);
+    if (pipe_pos) {
+        // Handle piped commands
+        char left_cmd[256] = {0};
+        char right_cmd[256] = {0};
+        
+        // Extract left command (before pipe)
+        size_t left_len = pipe_pos - cmd;
+        if (left_len >= sizeof(left_cmd)) left_len = sizeof(left_cmd) - 1;
+        for (size_t j = 0; j < left_len; j++) {
+            left_cmd[j] = cmd[j];
+        }
+        left_cmd[left_len] = '\0';
+        
+        // Trim trailing spaces from left command
+        while (left_len > 0 && left_cmd[left_len - 1] == ' ') {
+            left_cmd[--left_len] = '\0';
+        }
+        
+        // Extract right command (after pipe ||)
+        const char* right_start = pipe_pos + 2;  // Skip both '|' characters
+        while (*right_start == ' ') right_start++;
+        
+        size_t right_len = 0;
+        while (right_start[right_len] && right_len < sizeof(right_cmd) - 1) {
+            right_cmd[right_len] = right_start[right_len];
+            right_len++;
+        }
+        right_cmd[right_len] = '\0';
+        
+        // Trim trailing spaces from right command
+        while (right_len > 0 && right_cmd[right_len - 1] == ' ') {
+            right_cmd[--right_len] = '\0';
+        }
+        
+        // Check if right command is UDPSEND
+        char right_upper[256] = {0};
+        for (int i = 0; right_cmd[i] && i < 255; i++) {
+            right_upper[i] = right_cmd[i] >= 'a' && right_cmd[i] <= 'z' 
+                           ? right_cmd[i] - 32 
+                           : right_cmd[i];
+        }
+        
+        if (right_upper[0] == 'U' && right_upper[1] == 'D' && right_upper[2] == 'P' && 
+            right_upper[3] == 'S' && right_upper[4] == 'E' && right_upper[5] == 'N' && 
+            right_upper[6] == 'D' && (right_upper[7] == ' ' || right_upper[7] == '\0')) {
+            
+            // Parse UDPSEND arguments (IP and PORT only)
+            const char* args = right_cmd + 7;
+            while (*args == ' ') args++;
+            
+            if (!network_is_initialized()) {
+                cmd_write("Error: Network not initialized. Use NETINIT first.\n");
+                return;
+            }
+            
+            // Parse IP address
+            ipv4_address_t dest_ip;
+            int ip_bytes[4] = {0};
+            int ip_idx = 0;
+            int current = 0;
+            const char* p = args;
+            
+            // Parse IP
+            while (*p && ip_idx < 4) {
+                if (*p >= '0' && *p <= '9') {
+                    current = current * 10 + (*p - '0');
+                } else if (*p == '.' || *p == ' ') {
+                    ip_bytes[ip_idx++] = current;
+                    current = 0;
+                    if (*p == ' ') break;
+                }
+                p++;
+            }
+            if (ip_idx < 4 && current > 0) {
+                ip_bytes[ip_idx++] = current;
+            }
+            
+            if (ip_idx < 4) {
+                cmd_write("Error: Invalid IP address\n");
+                return;
+            }
+            
+            for (int k = 0; k < 4; k++) {
+                dest_ip.bytes[k] = (uint8_t)ip_bytes[k];
+            }
+            
+            // Parse port
+            while (*p == ' ') p++;
+            int port = 0;
+            while (*p >= '0' && *p <= '9') {
+                port = port * 10 + (*p - '0');
+                p++;
+            }
+            
+            if (port == 0 || port > 65535) {
+                cmd_write("Error: Invalid port number\n");
+                return;
+            }
+            
+            // Initialize pipe buffer
+            pipe_buffer_pos = 0;
+            pipe_capture_mode = true;
+            
+            // Execute the left command and capture its output
+            cmd_exec_single(left_cmd);
+            
+            // Disable pipe capture mode
+            pipe_capture_mode = false;
+            
+            // Null-terminate the captured output
+            pipe_buffer[pipe_buffer_pos] = '\0';
+            
+            if (pipe_buffer_pos == 0) {
+                cmd_write("Error: No output to send\n");
+                return;
+            }
+            
+            // Send UDP packet(s) with captured output (chunked if necessary)
+            const size_t chunk_size = 512;
+            size_t offset = 0;
+            int sent_bytes = 0;
+            
+            while (offset < (size_t)pipe_buffer_pos) {
+                size_t to_send = pipe_buffer_pos - offset;
+                if (to_send > chunk_size) {
+                    to_send = chunk_size;
+                }
+                
+                // Send directly from pipe buffer
+                int result = udp_send_packet(&dest_ip, (uint16_t)port, 54321, 
+                                            (const void*)(pipe_buffer + offset), to_send);
+                if (result == 0) {
+                    sent_bytes += to_send;
+                }
+                offset += to_send;
+            }
+            
+            if (sent_bytes > 0) {
+                cmd_write("UDP packets sent successfully (");
+                cmd_write_int(sent_bytes);
+                cmd_write(" bytes)\n");
+            } else {
+                cmd_write("Error: Failed to send UDP packets\n");
+            }
+            
+            return;
+        } else {
+            cmd_write("Error: Only UDPSEND is supported after pipe operator\n");
+            return;
+        }
+    }
+    
     // Check for redirection operators (> or >>)
     char *redirect_ptr = NULL;
     char redirect_op = 0;  // '>' or 'a' for append
