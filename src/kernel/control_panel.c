@@ -44,17 +44,18 @@ static uint32_t pattern_lumberjack[PATTERN_SIZE * PATTERN_SIZE];
 static uint32_t pattern_blue_diamond[PATTERN_SIZE * PATTERN_SIZE];
 
 static void generate_lumberjack_pattern(void) {
-    // Lumberjack pattern: 3x3 repeating cell
+    // Lumberjack pattern: 3x3 repeating cell, scaled 5x
     // Red corners, dark grey cross (top/left/right/bottom), black center
     uint32_t red = 0xFFDC143C;
     uint32_t dark_grey = 0xFF404040;
     uint32_t black = 0xFF000000;
+    int scale = 5;
     
     // Fill entire pattern with the 3x3 repeating cell
     for (int y = 0; y < PATTERN_SIZE; y++) {
         for (int x = 0; x < PATTERN_SIZE; x++) {
-            int cell_x = x % 3;
-            int cell_y = y % 3;
+            int cell_x = (x / scale) % 3;
+            int cell_y = (y / scale) % 3;
             
             uint32_t color;
             

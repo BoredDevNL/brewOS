@@ -35,7 +35,7 @@ static void about_paint(Window *win) {
     
     // Version info
     draw_string(offset_x, offset_y + 105, "BrewOS", COLOR_BLACK);
-    draw_string(offset_x, offset_y + 120, "BrewOS Version 1.10", COLOR_BLACK);
+    draw_string(offset_x, offset_y + 120, "BrewOS Version 1.12", COLOR_BLACK);
     draw_string(offset_x, offset_y + 135, "Kernel Version 2.1.0", COLOR_BLACK);
     
     // Copyright

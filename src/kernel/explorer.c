@@ -28,6 +28,7 @@ typedef struct {
     char name[256];
     bool is_directory;
     uint32_t size;
+    uint32_t color;
 } ExplorerItem;
 
 typedef enum {
@@ -239,6 +240,41 @@ static void dropdown_menu_toggle(void) {
 
 // === Explorer Logic ===
 
+static uint32_t explorer_get_folder_color(const char *folder_path) {
+    char color_file_path[256];
+    explorer_strcpy(color_file_path, folder_path);
+    if (color_file_path[explorer_strlen(color_file_path) - 1] != '/') {
+        explorer_strcat(color_file_path, "/");
+    }
+    explorer_strcat(color_file_path, ".color");
+    
+    FAT32_FileHandle *file = fat32_open(color_file_path, "r");
+    if (file) {
+        uint32_t color = 0;
+        int bytes_read = fat32_read(file, &color, sizeof(uint32_t));
+        fat32_close(file);
+        if (bytes_read == sizeof(uint32_t)) {
+            return color;
+        }
+    }
+    return COLOR_APPLE_YELLOW;
+}
+
+static void explorer_set_folder_color(const char *folder_path, uint32_t color) {
+    char color_file_path[256];
+    explorer_strcpy(color_file_path, folder_path);
+    if (color_file_path[explorer_strlen(color_file_path) - 1] != '/') {
+        explorer_strcat(color_file_path, "/");
+    }
+    explorer_strcat(color_file_path, ".color");
+    
+    FAT32_FileHandle *file = fat32_open(color_file_path, "w");
+    if (file) {
+        fat32_write(file, &color, sizeof(uint32_t));
+        fat32_close(file);
+    }
+}
+
 static void explorer_load_directory(const char *path) {
     explorer_strcpy(current_path, path);
     
@@ -247,9 +283,26 @@ static void explorer_load_directory(const char *path) {
     
     item_count = 0;
     for (int i = 0; i < count && i < EXPLORER_MAX_FILES; i++) {
-        explorer_strcpy(items[i].name, entries[i].name);
-        items[i].is_directory = entries[i].is_directory;
-        items[i].size = entries[i].size;
+        // Skip .color files
+        if (explorer_strcmp(entries[i].name, ".color") == 0) {
+            continue;
+        }
+
+        explorer_strcpy(items[item_count].name, entries[i].name);
+        items[item_count].is_directory = entries[i].is_directory;
+        items[item_count].size = entries[i].size;
+        
+        if (items[item_count].is_directory) {
+            char subfolder_path[256];
+            explorer_strcpy(subfolder_path, current_path);
+            if (subfolder_path[explorer_strlen(subfolder_path) - 1] != '/') {
+                explorer_strcat(subfolder_path, "/");
+            }
+            explorer_strcat(subfolder_path, items[item_count].name);
+            items[item_count].color = explorer_get_folder_color(subfolder_path);
+        } else {
+            items[item_count].color = COLOR_APPLE_YELLOW;
+        }
         item_count++;
     }
     
@@ -291,15 +344,21 @@ static void explorer_navigate_to(const char *dirname) {
 }
 
 // Draw a simple file icon
-static void explorer_draw_file_icon(int x, int y, bool is_dir) {
+static void explorer_draw_file_icon(int x, int y, bool is_dir, uint32_t color) {
     if (is_dir) {
-        // Folder icon - larger
-        draw_rect(x + 10, y + 10, 30, 5, COLOR_BLUE);  // Tab
-        draw_rect(x + 10, y + 15, 30, 25, COLOR_WHITE); // Main folder
-        draw_rect(x + 10, y + 15, 2, 25, COLOR_BLACK);
-        draw_rect(x + 10, y + 15, 30, 2, COLOR_BLACK);
-        draw_rect(x + 38, y + 15, 2, 25, COLOR_BLACK);
-        draw_rect(x + 10, y + 38, 30, 2, COLOR_BLACK);
+        // Folder icon (colored folder) - Desktop style
+        // Folder tab
+        draw_rect(x + 10, y + 10, 15, 6, COLOR_LTGRAY);
+        draw_rect(x + 10, y + 10, 15, 1, COLOR_BLACK);
+        draw_rect(x + 10, y + 10, 1, 6, COLOR_BLACK);
+        draw_rect(x + 24, y + 10, 1, 6, COLOR_BLACK);
+        
+        // Folder body
+        draw_rect(x + 10, y + 16, 25, 15, color);
+        draw_rect(x + 10, y + 16, 25, 1, COLOR_BLACK);
+        draw_rect(x + 10, y + 16, 1, 15, COLOR_BLACK);
+        draw_rect(x + 34, y + 16, 1, 15, COLOR_BLACK);
+        draw_rect(x + 10, y + 30, 25, 1, COLOR_BLACK);
     } else {
         // Document icon - larger
         draw_rect(x + 12, y + 10, 20, 25, COLOR_WHITE);
@@ -367,7 +426,7 @@ static void explorer_paint(Window *win) {
         draw_rect(item_x + 2, item_y + 2, EXPLORER_ITEM_WIDTH - 4, EXPLORER_ITEM_HEIGHT - 4, bg_color);
         
         // Draw icon (larger area)
-        explorer_draw_file_icon(item_x + 5, item_y + 5, items[i].is_directory);
+        explorer_draw_file_icon(item_x + 5, item_y + 5, items[i].is_directory, items[i].color);
         
         // Draw name below icon with text wrapping
         uint32_t text_color = (i == selected_item) ? COLOR_WHITE : COLOR_BLACK;
@@ -458,19 +517,37 @@ static void explorer_paint(Window *win) {
         int menu_screen_x = win->x + file_context_menu_x;
         int menu_screen_y = win->y + file_context_menu_y;
         
-        // Draw menu background
-        draw_rect(menu_screen_x, menu_screen_y, FILE_CONTEXT_MENU_WIDTH, FILE_CONTEXT_MENU_HEIGHT, COLOR_LTGRAY);
-        draw_bevel_rect(menu_screen_x, menu_screen_y, FILE_CONTEXT_MENU_WIDTH, FILE_CONTEXT_MENU_HEIGHT, true);
-        
-        // Draw menu items
-        int item_height = FILE_CONTEXT_MENU_HEIGHT / FILE_CONTEXT_ITEMS;
-        
-        // Item 1: "Open with Text Editor"
-        draw_string(menu_screen_x + 5, menu_screen_y + 5, "Open w/ Editor", COLOR_BLACK);
-        
-        // Item 2: "Open with Markdown Viewer" (only show if file is .md)
-        if (explorer_is_markdown_file(items[file_context_menu_item].name)) {
-            draw_string(menu_screen_x + 5, menu_screen_y + item_height + 5, "Open w/ Markdown", COLOR_BLACK);
+        if (items[file_context_menu_item].is_directory) {
+            // Folder context menu (Color selection)
+            int menu_height = 25 * 5; // 5 items, 25px each
+            
+            // Draw menu background
+            draw_rect(menu_screen_x, menu_screen_y, FILE_CONTEXT_MENU_WIDTH, menu_height, COLOR_LTGRAY);
+            draw_bevel_rect(menu_screen_x, menu_screen_y, FILE_CONTEXT_MENU_WIDTH, menu_height, true);
+            
+            // Draw menu items
+            int item_h = 25;
+            draw_string(menu_screen_x + 5, menu_screen_y + 5, "Blue", COLOR_APPLE_BLUE);
+            draw_string(menu_screen_x + 5, menu_screen_y + item_h + 5, "Red", COLOR_RED);
+            draw_string(menu_screen_x + 5, menu_screen_y + item_h * 2 + 5, "Yellow", COLOR_APPLE_YELLOW); // Text might be hard to read, but requested
+            draw_string(menu_screen_x + 5, menu_screen_y + item_h * 3 + 5, "Green", COLOR_APPLE_GREEN);
+            draw_string(menu_screen_x + 5, menu_screen_y + item_h * 4 + 5, "Black", COLOR_BLACK);
+        } else {
+            // File context menu
+            // Draw menu background
+            draw_rect(menu_screen_x, menu_screen_y, FILE_CONTEXT_MENU_WIDTH, FILE_CONTEXT_MENU_HEIGHT, COLOR_LTGRAY);
+            draw_bevel_rect(menu_screen_x, menu_screen_y, FILE_CONTEXT_MENU_WIDTH, FILE_CONTEXT_MENU_HEIGHT, true);
+            
+            // Draw menu items
+            int item_height = FILE_CONTEXT_MENU_HEIGHT / FILE_CONTEXT_ITEMS;
+            
+            // Item 1: "Open with Text Editor"
+            draw_string(menu_screen_x + 5, menu_screen_y + 5, "Open w/ Editor", COLOR_BLACK);
+            
+            // Item 2: "Open with Markdown Viewer" (only show if file is .md)
+            if (explorer_is_markdown_file(items[file_context_menu_item].name)) {
+                draw_string(menu_screen_x + 5, menu_screen_y + item_height + 5, "Open w/ Markdown", COLOR_BLACK);
+            }
         }
     }
 }
@@ -770,15 +847,13 @@ static void explorer_handle_right_click(Window *win, int x, int y) {
         if (x >= item_x && x < item_x + EXPLORER_ITEM_WIDTH &&
             y >= item_y && y < item_y + EXPLORER_ITEM_HEIGHT) {
             
-            // Right-click on a file item
-            if (!items[i].is_directory) {
-                // Show context menu
-                file_context_menu_visible = true;
-                file_context_menu_item = i;
-                file_context_menu_x = x;
-                file_context_menu_y = y;
-                return;
-            }
+            // Right-click on a file or folder item
+            // Show context menu
+            file_context_menu_visible = true;
+            file_context_menu_item = i;
+            file_context_menu_x = x;
+            file_context_menu_y = y;
+            return;
         }
     }
     
@@ -798,49 +873,78 @@ static void explorer_handle_file_context_menu_click(Window *win, int x, int y) {
     int relative_x = x - file_context_menu_x;
     int relative_y = y - file_context_menu_y;
     
+    int menu_height;
+    if (items[file_context_menu_item].is_directory) {
+        menu_height = 25 * 5;
+    } else {
+        menu_height = FILE_CONTEXT_MENU_HEIGHT;
+    }
+    
     if (relative_x < 0 || relative_x > FILE_CONTEXT_MENU_WIDTH ||
-        relative_y < 0 || relative_y > FILE_CONTEXT_MENU_HEIGHT) {
+        relative_y < 0 || relative_y > menu_height) {
         // Clicked outside menu - close it
         file_context_menu_visible = false;
         file_context_menu_item = -1;
         return;
     }
     
-    int item_height = FILE_CONTEXT_MENU_HEIGHT / FILE_CONTEXT_ITEMS;
-    int clicked_item = relative_y / item_height;
-    
-    // Build full path
-    char full_path[256];
-    explorer_strcpy(full_path, current_path);
-    if (full_path[explorer_strlen(full_path) - 1] != '/') {
-        explorer_strcat(full_path, "/");
-    }
-    explorer_strcat(full_path, items[file_context_menu_item].name);
-    
-    if (clicked_item == 0) {
-        // "Open with Text Editor"
-        win_editor.visible = true;
-        win_editor.focused = true;
-        int max_z = 0;
-        if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
-        if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
-        if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
-        if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
-        if (win_markdown.z_index > max_z) max_z = win_markdown.z_index;
-        win_editor.z_index = max_z + 1;
-        editor_open_file(full_path);
-    } else if (clicked_item == 1 && explorer_is_markdown_file(items[file_context_menu_item].name)) {
-        // "Open with Markdown Viewer"
-        win_markdown.visible = true;
-        win_markdown.focused = true;
-        int max_z = 0;
-        if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
-        if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
-        if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
-        if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
-        if (win_editor.z_index > max_z) max_z = win_editor.z_index;
-        win_markdown.z_index = max_z + 1;
-        markdown_open_file(full_path);
+    if (items[file_context_menu_item].is_directory) {
+        int clicked_item = relative_y / 25;
+        uint32_t new_color = items[file_context_menu_item].color;
+        
+        if (clicked_item == 0) new_color = COLOR_APPLE_BLUE;
+        else if (clicked_item == 1) new_color = COLOR_RED;
+        else if (clicked_item == 2) new_color = COLOR_APPLE_YELLOW;
+        else if (clicked_item == 3) new_color = COLOR_APPLE_GREEN;
+        else if (clicked_item == 4) new_color = COLOR_BLACK;
+        
+        items[file_context_menu_item].color = new_color;
+        
+        // Save to file
+        char full_path[256];
+        explorer_strcpy(full_path, current_path);
+        if (full_path[explorer_strlen(full_path) - 1] != '/') {
+            explorer_strcat(full_path, "/");
+        }
+        explorer_strcat(full_path, items[file_context_menu_item].name);
+        explorer_set_folder_color(full_path, new_color);
+    } else {
+        int item_height = FILE_CONTEXT_MENU_HEIGHT / FILE_CONTEXT_ITEMS;
+        int clicked_item = relative_y / item_height;
+        
+        // Build full path
+        char full_path[256];
+        explorer_strcpy(full_path, current_path);
+        if (full_path[explorer_strlen(full_path) - 1] != '/') {
+            explorer_strcat(full_path, "/");
+        }
+        explorer_strcat(full_path, items[file_context_menu_item].name);
+        
+        if (clicked_item == 0) {
+            // "Open with Text Editor"
+            win_editor.visible = true;
+            win_editor.focused = true;
+            int max_z = 0;
+            if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
+            if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
+            if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
+            if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
+            if (win_markdown.z_index > max_z) max_z = win_markdown.z_index;
+            win_editor.z_index = max_z + 1;
+            editor_open_file(full_path);
+        } else if (clicked_item == 1 && explorer_is_markdown_file(items[file_context_menu_item].name)) {
+            // "Open with Markdown Viewer"
+            win_markdown.visible = true;
+            win_markdown.focused = true;
+            int max_z = 0;
+            if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
+            if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
+            if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
+            if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
+            if (win_editor.z_index > max_z) max_z = win_editor.z_index;
+            win_markdown.z_index = max_z + 1;
+            markdown_open_file(full_path);
+        }
     }
     
     file_context_menu_visible = false;
