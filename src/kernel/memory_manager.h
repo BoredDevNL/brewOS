@@ -6,8 +6,8 @@
 #include <stdbool.h>
 
 // Memory Manager Configuration
-#define MEMORY_POOL_SIZE (4 * 1024 * 1024)  // 4MB pool
-#define MAX_ALLOCATIONS 1024
+#define DEFAULT_POOL_SIZE (512 * 1024 * 1024)  // 512MB default (can be overridden)
+#define MAX_ALLOCATIONS 4096  // Increased for larger pools
 #define MAX_FRAGMENTATION_SLOTS 2048
 
 // Allocation block metadata
@@ -34,6 +34,7 @@ typedef struct {
 
 // Public API
 void memory_manager_init(void);
+void memory_manager_init_with_size(size_t pool_size);
 
 // Allocation/Deallocation
 void* kmalloc(size_t size);

@@ -19,9 +19,16 @@ static volatile struct limine_framebuffer_request framebuffer_request = {
     .revision = 1
 };
 
+__attribute__((used, section(".requests")))
+static volatile struct limine_memmap_request memmap_request = {
+    .id = LIMINE_MEMMAP_REQUEST,
+    .revision = 0
+};
+
 __attribute__((used, section(".requests_start")))
 static volatile struct limine_request *const requests_start_marker[] = {
     (struct limine_request *)&framebuffer_request,
+    (struct limine_request *)&memmap_request,
     NULL
 };
 
@@ -60,8 +67,28 @@ void kmain(void) {
     // Load IDT and Enable Interrupts
     idt_load();
 
-    // 2.5 Memory Manager Init
-    memory_manager_init();
+    // 2.5 Memory Manager Init - Calculate available RAM from Limine
+    size_t total_usable_memory = 0;
+    if (memmap_request.response != NULL) {
+        for (uint64_t i = 0; i < memmap_request.response->entry_count; i++) {
+            struct limine_memmap_entry *entry = memmap_request.response->entries[i];
+            
+            // Count usable memory regions
+            if (entry->type == LIMINE_MEMMAP_USABLE) {
+                total_usable_memory += entry->length;
+            }
+        }
+    }
+    
+    // Initialize memory manager with available memory (cap at 2GB for practical reasons)
+    size_t pool_size = total_usable_memory > (2 * 1024 * 1024 * 1024) ? 
+                       (2 * 1024 * 1024 * 1024) : total_usable_memory;
+    
+    if (pool_size == 0) {
+        pool_size = 512 * 1024 * 1024;  // Fallback to 512MB if detection fails
+    }
+    
+    memory_manager_init_with_size(pool_size);
 
     // 3. PS/2 Init (Mouse/Keyboard)
     asm("cli");

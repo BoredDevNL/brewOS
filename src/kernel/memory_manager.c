@@ -3,7 +3,8 @@
 #include <stdint.h>
 
 // --- Internal State ---
-static uint8_t memory_pool[MEMORY_POOL_SIZE] __attribute__((aligned(4096)));
+static uint8_t *memory_pool = NULL;  // Dynamically allocated
+static size_t memory_pool_size = DEFAULT_POOL_SIZE;  // Track actual pool size
 static MemBlock block_list[MAX_ALLOCATIONS];
 static int block_count = 0;
 static size_t total_allocated = 0;
@@ -45,7 +46,7 @@ static uint32_t get_timestamp(void) {
 static void* find_free_space(size_t size) {
     size_t offset = 0;
     
-    while (offset + size <= MEMORY_POOL_SIZE) {
+    while (offset + size <= memory_pool_size) {
         bool space_free = true;
         
         // Check if this range is free
@@ -95,7 +96,7 @@ static size_t calculate_fragmentation(void) {
     
     // Count gaps between allocated blocks
     size_t total_gaps = 0;
-    void *pool_end = (uint8_t *)memory_pool + MEMORY_POOL_SIZE;
+    void *pool_end = (uint8_t *)memory_pool + memory_pool_size;
     
     void *current_end = memory_pool;
     
@@ -115,8 +116,17 @@ static size_t calculate_fragmentation(void) {
 
 // --- Public API ---
 
-void memory_manager_init(void) {
+void memory_manager_init_with_size(size_t pool_size) {
     if (initialized) return;
+    
+    memory_pool_size = pool_size;
+    
+    // Initialize memory pool - in a real kernel, this would be passed a physical address
+    // For now, we use a simple tracking mechanism where allocations are tracked virtually
+    // The caller is responsible for ensuring the pool_size is valid
+    if (memory_pool == NULL) {
+        memory_pool = (uint8_t *)0x100000000;  // Start from 4GB boundary as virtual tracking
+    }
     
     // Clear metadata
     mem_memset(block_list, 0, sizeof(block_list));
@@ -127,7 +137,7 @@ void memory_manager_init(void) {
     
     // Create initial free block representing entire pool
     block_list[0].address = memory_pool;
-    block_list[0].size = MEMORY_POOL_SIZE;
+    block_list[0].size = memory_pool_size;
     block_list[0].allocated = false;
     block_list[0].allocation_id = 0;
     block_count = 1;
@@ -135,17 +145,21 @@ void memory_manager_init(void) {
     initialized = true;
 }
 
+void memory_manager_init(void) {
+    memory_manager_init_with_size(DEFAULT_POOL_SIZE);
+}
+
 void* kmalloc(size_t size) {
     if (!initialized) {
         memory_manager_init();
     }
     
-    if (size == 0 || size > MEMORY_POOL_SIZE) {
+    if (size == 0 || size > memory_pool_size) {
         return NULL;
     }
     
     // Check if we can allocate
-    if (total_allocated + size > MEMORY_POOL_SIZE) {
+    if (total_allocated + size > memory_pool_size) {
         return NULL;
     }
     
@@ -245,13 +259,13 @@ void* krealloc(void *ptr, size_t new_size) {
 MemStats memory_get_stats(void) {
     MemStats stats;
     
-    stats.total_memory = MEMORY_POOL_SIZE;
+    stats.total_memory = memory_pool_size;
     stats.used_memory = total_allocated;
-    stats.available_memory = MEMORY_POOL_SIZE - total_allocated;
+    stats.available_memory = memory_pool_size - total_allocated;
     stats.allocated_blocks = 0;
     stats.free_blocks = 0;
     stats.largest_free_block = 0;
-    stats.smallest_free_block = MEMORY_POOL_SIZE;
+    stats.smallest_free_block = memory_pool_size;
     stats.peak_memory_used = peak_allocated;
     
     // Count and analyze blocks
@@ -417,7 +431,7 @@ bool memory_is_valid_ptr(void *ptr) {
     if (ptr == NULL) return false;
     
     void *pool_start = memory_pool;
-    void *pool_end = (uint8_t *)memory_pool + MEMORY_POOL_SIZE;
+    void *pool_end = (uint8_t *)memory_pool + memory_pool_size;
     
     if (ptr < pool_start || ptr >= pool_end) {
         return false;
