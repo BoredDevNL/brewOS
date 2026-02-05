@@ -86,11 +86,10 @@ qemu-system-x86_64 -m 2G -serial stdio -cdrom brewos.iso -boot d
 ## Project Structure
 
 - `src/kernel/` - Main kernel implementation
-  - `boot.asm` - Boot assembly code
-  - `main.c` - Kernel entry point
-  - `*.c / *.h` - Core kernel modules (graphics, interrupts, filesystem, etc.)
-  - `cli_apps/` - Command-line applications
-  - `wallpaper.ppm` - Default desktop wallpaper
+- `boot.asm` - Boot assembly code
+- `main.c` - Kernel entry point
+- `*.c / *.h` - Core kernel modules (graphics, interrupts, filesystem, etc.)
+- `cli_apps/` - Command-line applications
 - `build/` - Compiled object files (generated during build)
 - `iso_root/` - ISO filesystem layout (generated during build)
 - `limine/` - Limine bootloader files (downloaded automatically)
