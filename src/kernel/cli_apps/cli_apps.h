@@ -15,7 +15,7 @@ void cli_cmd_license(char *args);
 void cli_cmd_txtedit(char *args);
 void cli_cmd_blind(char *args);
 void cli_cmd_readtheman(char *args);
-void cli_cmd_about(char *args);
+void cli_cmd_brewver(char *args);
 void cli_cmd_clear(char *args);
 void cli_cmd_exit(char *args);
 
