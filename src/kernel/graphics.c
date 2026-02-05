@@ -5,6 +5,11 @@
 static struct limine_framebuffer *g_fb = NULL;
 static uint32_t g_bg_color = 0xFF696969;  // Dark gray background
 
+// Pattern support
+#define PATTERN_SIZE 128
+static uint32_t g_bg_pattern[PATTERN_SIZE * PATTERN_SIZE];
+static bool g_use_pattern = false;
+
 // Dirty rectangle tracking
 static DirtyRect g_dirty = {0, 0, 0, 0, false};
 
@@ -145,11 +150,36 @@ void draw_string(int x, int y, const char *s, uint32_t color) {
 
 void draw_desktop_background(void) {
     if (!g_fb) return;
-    draw_rect(0, 0, g_fb->width, g_fb->height, g_bg_color);
+    
+    if (g_use_pattern) {
+        // Draw tiled pattern
+        for (int y = 0; y < (int)g_fb->height; y++) {
+            for (int x = 0; x < (int)g_fb->width; x++) {
+                int px = x % PATTERN_SIZE;
+                int py = y % PATTERN_SIZE;
+                uint32_t color = g_bg_pattern[py * PATTERN_SIZE + px];
+                put_pixel(x, y, color);
+            }
+        }
+    } else {
+        // Draw solid color
+        draw_rect(0, 0, g_fb->width, g_fb->height, g_bg_color);
+    }
 }
 
 void graphics_set_bg_color(uint32_t color) {
     g_bg_color = color;
+    g_use_pattern = false;
+}
+
+void graphics_set_bg_pattern(const uint32_t *pattern) {
+    if (!pattern) return;
+    
+    // Copy pattern to internal buffer
+    for (int i = 0; i < PATTERN_SIZE * PATTERN_SIZE; i++) {
+        g_bg_pattern[i] = pattern[i];
+    }
+    g_use_pattern = true;
 }
 
 // Double buffering functions

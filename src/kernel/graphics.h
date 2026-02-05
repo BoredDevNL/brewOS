@@ -18,6 +18,7 @@ void draw_char(int x, int y, char c, uint32_t color);
 void draw_string(int x, int y, const char *s, uint32_t color);
 void draw_desktop_background(void);
 void graphics_set_bg_color(uint32_t color);
+void graphics_set_bg_pattern(const uint32_t *pattern);  // 128x128 pattern
 
 // Get screen dimensions
 int get_screen_width(void);

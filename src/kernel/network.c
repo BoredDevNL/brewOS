@@ -6,7 +6,7 @@
 
 static int network_initialized = 0;
 static mac_address_t our_mac;
-static ipv4_address_t our_ip = {{0,0,0,0}};
+static ipv4_address_t ip_address = {{0,0,0,0}};
 static uint16_t ipv4_id_counter = 0;
 
 typedef struct { ipv4_address_t ip; mac_address_t mac; uint32_t timestamp; int valid; } arp_cache_entry_t;
@@ -63,8 +63,8 @@ int network_get_mac_address(mac_address_t* mac){
     return 0;
 }
 
-int network_get_ipv4_address(ipv4_address_t* ip){ if(!network_initialized) return -1; *ip=our_ip; return 0; }
-int network_set_ipv4_address(const ipv4_address_t* ip){ if(!network_initialized) return -1; our_ip=*ip; return 0; }
+int network_get_ipv4_address(ipv4_address_t* ip){ if(!network_initialized) return -1; *ip=ip_address; return 0; }
+int network_set_ipv4_address(const ipv4_address_t* ip){ if(!network_initialized) return -1; ip_address=*ip; return 0; }
 
 int network_send_frame(const void* data,size_t length){ if(!network_initialized) return -1; if(length>ETH_FRAME_MAX_SIZE) return -1; return e1000_send_packet(data,length); }
 
@@ -102,7 +102,7 @@ void network_process_frames(void){
                 ip->checksum=checksum;
                 if(checksum==calc){
                     int for_our_ip=1;
-                    for(int i=0;i<4;i++){ if(ip->dest_ip[i]!=our_ip.bytes[i]) { for_our_ip=0; break; } }
+                    for(int i=0;i<4;i++){ if(ip->dest_ip[i]!=ip_address.bytes[i]) { for_our_ip=0; break; } }
                     if(for_our_ip || ip->dest_ip[0]==255){
                         mac_address_t src_mac;
                         kmemcpy(src_mac.bytes,eth->src_mac,6);
@@ -128,7 +128,7 @@ int arp_send_request(const ipv4_address_t* target_ip){
     arp->proto_len=4;
     arp->opcode=htons(ARP_OP_REQUEST);
     kmemcpy(arp->sender_mac,our_mac.bytes,6);
-    kmemcpy(arp->sender_ip,our_ip.bytes,4);
+    kmemcpy(arp->sender_ip,ip_address.bytes,4);
     for(int i=0;i<6;i++) arp->target_mac[i]=0;
     kmemcpy(arp->target_ip,target_ip->bytes,4);
     size_t frame_length=sizeof(eth_header_t)+sizeof(arp_header_t);
@@ -153,7 +153,7 @@ void arp_process_packet(const arp_header_t* arp,size_t length){
     arp_cache_add(&sender_ip,&sender_mac);
     if(opcode==ARP_OP_REQUEST){
         int is_for_us=1;
-        for(int i=0;i<4;i++){ if(arp->target_ip[i]!=our_ip.bytes[i]) { is_for_us=0; break; } }
+        for(int i=0;i<4;i++){ if(arp->target_ip[i]!=ip_address.bytes[i]) { is_for_us=0; break; } }
         if(is_for_us){
             uint8_t frame[ETH_FRAME_MAX_SIZE];
             eth_header_t* eth=(eth_header_t*)frame;
@@ -167,7 +167,7 @@ void arp_process_packet(const arp_header_t* arp,size_t length){
             r->proto_len=4;
             r->opcode=htons(ARP_OP_REPLY);
             kmemcpy(r->sender_mac,our_mac.bytes,6);
-            kmemcpy(r->sender_ip,our_ip.bytes,4);
+            kmemcpy(r->sender_ip,ip_address.bytes,4);
             kmemcpy(r->target_mac,arp->sender_mac,6);
             kmemcpy(r->target_ip,arp->sender_ip,4);
             size_t frame_length=sizeof(eth_header_t)+sizeof(arp_header_t);
@@ -197,7 +197,7 @@ int ipv4_send_packet(const ipv4_address_t* dest_ip,uint8_t protocol,const void* 
     ip->ttl=64;
     ip->protocol=protocol;
     ip->checksum=0;
-    kmemcpy(ip->src_ip,our_ip.bytes,4);
+    kmemcpy(ip->src_ip,ip_address.bytes,4);
     kmemcpy(ip->dest_ip,dest_ip->bytes,4);
     ip->checksum=ipv4_checksum(ip);
     kmemcpy(ip_payload,data,data_length);
@@ -222,7 +222,7 @@ int ipv4_send_packet_to_mac(const ipv4_address_t* dest_ip,const mac_address_t* d
     ip->ttl=64;
     ip->protocol=protocol;
     ip->checksum=0;
-    kmemcpy(ip->src_ip,our_ip.bytes,4);
+    kmemcpy(ip->src_ip,ip_address.bytes,4);
     kmemcpy(ip->dest_ip,dest_ip->bytes,4);
     ip->checksum=ipv4_checksum(ip);
     kmemcpy(ip_payload,data,data_length);
@@ -405,10 +405,10 @@ static void dhcp_udp_callback(const ipv4_address_t* src_ip,uint16_t src_port,con
         if(dhcp_server_id!=0) dhcp_state=1;
     } else if(mtype==DHCP_MSG_ACK){
         uint32_t yi_host=ntohl32(pkt->yiaddr);
-        our_ip.bytes[0]=(uint8_t)((yi_host>>24)&0xFF);
-        our_ip.bytes[1]=(uint8_t)((yi_host>>16)&0xFF);
-        our_ip.bytes[2]=(uint8_t)((yi_host>>8)&0xFF);
-        our_ip.bytes[3]=(uint8_t)(yi_host&0xFF);
+        ip_address.bytes[0]=(uint8_t)((yi_host>>24)&0xFF);
+        ip_address.bytes[1]=(uint8_t)((yi_host>>16)&0xFF);
+        ip_address.bytes[2]=(uint8_t)((yi_host>>8)&0xFF);
+        ip_address.bytes[3]=(uint8_t)(yi_host&0xFF);
         dhcp_state=2;
     } else if(mtype==DHCP_MSG_NAK){
         dhcp_state=-1;
