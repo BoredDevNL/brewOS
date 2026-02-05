@@ -54,7 +54,10 @@ static void editor_ensure_cursor_visible(void);
 
 static void editor_clear_all(void) {
     for (int i = 0; i < EDITOR_MAX_LINES; i++) {
-        lines[i].content[0] = 0;
+        // Zero out entire buffer to prevent ghost text from previous file
+        for (int j = 0; j < EDITOR_MAX_LINE_LEN; j++) {
+            lines[i].content[j] = 0;
+        }
         lines[i].length = 0;
     }
     line_count = 1;
@@ -264,44 +267,104 @@ static void editor_paint(Window *win) {
     // Fill editor background
     draw_rect(offset_x, offset_y + 30, content_width, content_height - 55, COLOR_WHITE);
     
-    // Draw line numbers and content
-    int visible_lines = (content_height - 55) / EDITOR_LINE_HEIGHT;
-    int max_line = scroll_top + visible_lines;
-    if (max_line > line_count) max_line = line_count;
+    // Calculate available width for text (accounting for line numbers)
+    int text_start_x = offset_x + 40;
+    int available_width = content_width - 40;
+    int max_chars_per_line = available_width / EDITOR_CHAR_WIDTH;
+    if (max_chars_per_line < 1) max_chars_per_line = 1;
     
-    for (int i = scroll_top; i < max_line; i++) {
-        int display_y = offset_y + 35 + (i - scroll_top) * EDITOR_LINE_HEIGHT;
+    // Draw line numbers and content with word wrapping
+    int display_line = 0;
+    int visible_lines = (content_height - 55) / EDITOR_LINE_HEIGHT;
+    int max_display_lines = visible_lines;
+    
+    int line_idx = scroll_top;
+    while (line_idx < line_count && display_line < max_display_lines) {
+        int display_y = offset_y + 35 + display_line * EDITOR_LINE_HEIGHT;
         
-        // Draw line number
-        char line_num_str[16];
-        int temp = i + 1;
-        int str_len = 0;
-        if (temp == 0) {
-            line_num_str[0] = '0';
-            str_len = 1;
-        } else {
-            while (temp > 0) {
-                line_num_str[str_len++] = (temp % 10) + '0';
-                temp /= 10;
+        // Only draw line number for first wrapped line of this editor line
+        if (display_line == 0 || line_idx < line_count) {
+            // Draw line number
+            char line_num_str[16];
+            int temp = line_idx + 1;
+            int str_len = 0;
+            if (temp == 0) {
+                line_num_str[0] = '0';
+                str_len = 1;
+            } else {
+                while (temp > 0) {
+                    line_num_str[str_len++] = (temp % 10) + '0';
+                    temp /= 10;
+                }
+                // Reverse
+                for (int j = 0; j < str_len / 2; j++) {
+                    char t = line_num_str[j];
+                    line_num_str[j] = line_num_str[str_len - 1 - j];
+                    line_num_str[str_len - 1 - j] = t;
+                }
             }
-            // Reverse
-            for (int j = 0; j < str_len / 2; j++) {
-                char t = line_num_str[j];
-                line_num_str[j] = line_num_str[str_len - 1 - j];
-                line_num_str[str_len - 1 - j] = t;
+            line_num_str[str_len] = 0;
+            draw_string(offset_x + 4, display_y, line_num_str, COLOR_DKGRAY);
+        }
+        
+        // Word-based text wrapping for this line
+        const char *text = lines[line_idx].content;
+        int text_len = lines[line_idx].length;
+        int char_idx = 0;
+        int local_display_line = 0;
+        
+        while (char_idx < text_len && display_line < max_display_lines) {
+            int current_display_y = offset_y + 35 + display_line * EDITOR_LINE_HEIGHT;
+            
+            // Extract segment (up to max_chars_per_line)
+            char segment[256];
+            int segment_len = 0;
+            int segment_start = char_idx;
+            
+            while (char_idx < text_len && segment_len < max_chars_per_line) {
+                segment[segment_len++] = text[char_idx++];
             }
+            segment[segment_len] = 0;
+            
+            // Word-based wrapping: find last space if we didn't reach end
+            if (char_idx < text_len && segment_len > 0) {
+                int last_space = -1;
+                for (int i = segment_len - 1; i >= 0; i--) {
+                    if (segment[i] == ' ') {
+                        last_space = i;
+                        break;
+                    }
+                }
+                
+                if (last_space > 0) {
+                    segment_len = last_space;
+                    segment[segment_len] = 0;
+                    char_idx = segment_start + last_space + 1;
+                    // Skip additional spaces
+                    while (char_idx < text_len && text[char_idx] == ' ') {
+                        char_idx++;
+                    }
+                }
+            }
+            
+            // Draw the text segment
+            if (segment_len > 0) {
+                draw_string(text_start_x, current_display_y, segment, COLOR_BLACK);
+            }
+            
+            // Draw cursor if on this line and wrapped segment
+            if (line_idx == cursor_line && cursor_col >= segment_start && cursor_col < segment_start + segment_len) {
+                int cursor_x = text_start_x + ((cursor_col - segment_start) * EDITOR_CHAR_WIDTH);
+                draw_rect(cursor_x, current_display_y, 2, 10, COLOR_BLACK);
+            }
+            
+            display_line++;
+            local_display_line++;
+            
+            if (char_idx >= text_len) break;
         }
-        line_num_str[str_len] = 0;
-        draw_string(offset_x + 4, display_y, line_num_str, COLOR_DKGRAY);
         
-        // Draw line content
-        draw_string(offset_x + 40, display_y, lines[i].content, COLOR_BLACK);
-        
-        // Draw cursor if on this line
-        if (i == cursor_line) {
-            int cursor_x = offset_x + 40 + (cursor_col * EDITOR_CHAR_WIDTH);
-            draw_rect(cursor_x, display_y, 2, 10, COLOR_BLACK);
-        }
+        line_idx++;
     }
     
     // Draw status bar at bottom

@@ -6,6 +6,7 @@
 #include "cli_apps/cli_utils.h"
 #include "explorer.h"
 #include "editor.h"
+#include "markdown.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include "notepad.h"
@@ -25,7 +26,7 @@ static int drag_offset_x = 0;
 static int drag_offset_y = 0;
 
 // Windows array for z-order management
-static Window *all_windows[8];
+static Window *all_windows[9];
 static int window_count = 0;
 
 // Redraw system
@@ -121,7 +122,7 @@ void draw_folder_icon(int x, int y, const char *label) {
     draw_rect(x + 19, y, 1, 6, COLOR_BLACK);
     
     // Folder body
-    draw_rect(x + 5, y + 6, 25, 15, COLOR_LTGRAY);
+    draw_rect(x + 5, y + 6, 25, 15, COLOR_APPLE_YELLOW);
     draw_rect(x + 5, y + 6, 25, 1, COLOR_BLACK);
     draw_rect(x + 5, y + 6, 1, 15, COLOR_BLACK);
     draw_rect(x + 29, y + 6, 1, 15, COLOR_BLACK);
@@ -678,6 +679,7 @@ void wm_handle_key(char c) {
     else if (win_calculator.focused && win_calculator.visible) target = &win_calculator;
     else if (win_explorer.focused && win_explorer.visible) target = &win_explorer;
     else if (win_editor.focused && win_editor.visible) target = &win_editor;
+    else if (win_markdown.focused && win_markdown.visible) target = &win_markdown;
     else if (win_control_panel.focused && win_control_panel.visible) target = &win_control_panel;
     
     if (!target) return;
@@ -704,6 +706,7 @@ void wm_init(void) {
     calculator_init();
     explorer_init();
     editor_init();
+    markdown_init();
     control_panel_init();
     about_init();
     minesweeper_init();
@@ -714,9 +717,10 @@ void wm_init(void) {
     win_calculator.z_index = 2;
     win_explorer.z_index = 3;
     win_editor.z_index = 4;
-    win_control_panel.z_index = 5;
-    win_about.z_index = 6;
-    win_minesweeper.z_index = 7;
+    win_markdown.z_index = 5;
+    win_control_panel.z_index = 6;
+    win_about.z_index = 7;
+    win_minesweeper.z_index = 8;
     
     // Register windows in array
     all_windows[0] = &win_notepad;
@@ -724,10 +728,11 @@ void wm_init(void) {
     all_windows[2] = &win_calculator;
     all_windows[3] = &win_explorer;
     all_windows[4] = &win_editor;
-    all_windows[5] = &win_control_panel;
-    all_windows[6] = &win_about;
-    all_windows[7] = &win_minesweeper;
-    window_count = 8;
+    all_windows[5] = &win_markdown;
+    all_windows[6] = &win_control_panel;
+    all_windows[7] = &win_about;
+    all_windows[8] = &win_minesweeper;
+    window_count = 9;
     
     // Only show Explorer and Notepad on desktop (Explorer on top)
     win_explorer.visible = false;
@@ -742,6 +747,7 @@ void wm_init(void) {
     win_cmd.visible = false;
     win_calculator.visible = false;
     win_editor.visible = false;
+    win_markdown.visible = false;
     win_control_panel.visible = false;
     win_about.visible = false;
     win_minesweeper.visible = false;

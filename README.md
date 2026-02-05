@@ -1,4 +1,4 @@
-# Brew OS 1.01 Alpha
+# Brew OS 1.03 Pre-Alpha
 
 ## Brewkernel is now BrewOS!
 Brewkernel will from now on be deprecated as it's core became too messy. I have built a less bloated kernel and wrote a DE above it, which is why it is now an OS instead of a kernel (in my opinion).

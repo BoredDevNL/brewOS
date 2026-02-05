@@ -3,6 +3,7 @@
 #include "fat32.h"
 #include "wm.h"
 #include "editor.h"
+#include "markdown.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -57,6 +58,15 @@ static int dropdown_menu_item_height = 25;
 #define DROPDOWN_MENU_WIDTH 120
 #define DROPDOWN_MENU_ITEMS 3
 
+// File context menu state
+static bool file_context_menu_visible = false;
+static int file_context_menu_x = 0;
+static int file_context_menu_y = 0;
+static int file_context_menu_item = -1;  // Which item is being right-clicked
+#define FILE_CONTEXT_MENU_WIDTH 140
+#define FILE_CONTEXT_MENU_HEIGHT 50
+#define FILE_CONTEXT_ITEMS 2  // "Open with Text Editor" and "Open with Markdown Viewer"
+
 // === Helper Functions ===
 
 static size_t explorer_strlen(const char *str);
@@ -64,6 +74,8 @@ static void explorer_strcpy(char *dest, const char *src);
 static int explorer_strcmp(const char *s1, const char *s2);
 static void explorer_strcat(char *dest, const char *src);
 static void explorer_load_directory(const char *path);
+static void explorer_handle_right_click(Window *win, int x, int y);
+static void explorer_handle_file_context_menu_click(Window *win, int x, int y);
 
 static size_t explorer_strlen(const char *str) {
     size_t len = 0;
@@ -87,6 +99,28 @@ static int explorer_strcmp(const char *s1, const char *s2) {
 static void explorer_strcat(char *dest, const char *src) {
     while (*dest) dest++;
     explorer_strcpy(dest, src);
+}
+
+// Get file extension (e.g., "md" from "file.md")
+static const char* explorer_get_extension(const char *filename) {
+    const char *dot = filename;
+    const char *ext = "";
+    
+    // Find the last dot
+    while (*dot) {
+        if (*dot == '.') {
+            ext = dot + 1;
+        }
+        dot++;
+    }
+    
+    return ext;
+}
+
+// Check if file is markdown
+static bool explorer_is_markdown_file(const char *filename) {
+    const char *ext = explorer_get_extension(filename);
+    return explorer_strcmp(ext, "md") == 0;
 }
 
 // === Dialog and File Operations ===
@@ -417,12 +451,40 @@ static void explorer_paint(Window *win) {
         draw_button(dlg_x + 50, dlg_y + 65, 80, 25, "Delete", false);
         draw_button(dlg_x + 170, dlg_y + 65, 80, 25, "Cancel", false);
     }
+    
+    // Draw file context menu if visible
+    if (file_context_menu_visible && file_context_menu_item >= 0) {
+        // Convert window-relative coordinates to screen coordinates for drawing
+        int menu_screen_x = win->x + file_context_menu_x;
+        int menu_screen_y = win->y + file_context_menu_y;
+        
+        // Draw menu background
+        draw_rect(menu_screen_x, menu_screen_y, FILE_CONTEXT_MENU_WIDTH, FILE_CONTEXT_MENU_HEIGHT, COLOR_LTGRAY);
+        draw_bevel_rect(menu_screen_x, menu_screen_y, FILE_CONTEXT_MENU_WIDTH, FILE_CONTEXT_MENU_HEIGHT, true);
+        
+        // Draw menu items
+        int item_height = FILE_CONTEXT_MENU_HEIGHT / FILE_CONTEXT_ITEMS;
+        
+        // Item 1: "Open with Text Editor"
+        draw_string(menu_screen_x + 5, menu_screen_y + 5, "Open w/ Editor", COLOR_BLACK);
+        
+        // Item 2: "Open with Markdown Viewer" (only show if file is .md)
+        if (explorer_is_markdown_file(items[file_context_menu_item].name)) {
+            draw_string(menu_screen_x + 5, menu_screen_y + item_height + 5, "Open w/ Markdown", COLOR_BLACK);
+        }
+    }
 }
 
 // === Mouse Handler ===
 
 static void explorer_handle_click(Window *win, int x, int y) {
-    // Handle dialog clicks first
+    // Handle file context menu clicks first
+    if (file_context_menu_visible) {
+        explorer_handle_file_context_menu_click(win, x, y);
+        return;
+    }
+    
+    // Handle dialog clicks
     if (dialog_state == DIALOG_CREATE_FILE || dialog_state == DIALOG_CREATE_FOLDER) {
         int dlg_x = win->w / 2 - 150;
         int dlg_y = win->h / 2 - 60;
@@ -549,7 +611,7 @@ static void explorer_handle_click(Window *win, int x, int y) {
                 if (items[i].is_directory) {
                     explorer_navigate_to(items[i].name);
                 } else {
-                    // Open file in editor
+                    // Open file - check type
                     char full_path[256];
                     explorer_strcpy(full_path, current_path);
                     if (full_path[explorer_strlen(full_path) - 1] != '/') {
@@ -557,19 +619,32 @@ static void explorer_handle_click(Window *win, int x, int y) {
                     }
                     explorer_strcat(full_path, items[i].name);
                     
-                    // Open in editor and bring to front
-                    win_editor.visible = true;
-                    win_editor.focused = true;
-                    int max_z = 0;
-                    for (int j = 0; j < 5; j++) {  // window_count is 5
-                        // Need to find max z_index - check all windows
+                    // Check if markdown file
+                    if (explorer_is_markdown_file(items[i].name)) {
+                        // Open with markdown viewer
+                        win_markdown.visible = true;
+                        win_markdown.focused = true;
+                        int max_z = 0;
                         if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
                         if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
                         if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
                         if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
+                        if (win_editor.z_index > max_z) max_z = win_editor.z_index;
+                        win_markdown.z_index = max_z + 1;
+                        markdown_open_file(full_path);
+                    } else {
+                        // Open with text editor
+                        win_editor.visible = true;
+                        win_editor.focused = true;
+                        int max_z = 0;
+                        if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
+                        if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
+                        if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
+                        if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
+                        if (win_markdown.z_index > max_z) max_z = win_markdown.z_index;
+                        win_editor.z_index = max_z + 1;
+                        editor_open_file(full_path);
                     }
-                    win_editor.z_index = max_z + 1;
-                    editor_open_file(full_path);
                 }
                 last_clicked_item = -1;
             } else {
@@ -678,6 +753,100 @@ static void explorer_handle_key(Window *win, char c) {
     }
 }
 
+// === Right-Click Handler ===
+
+static void explorer_handle_right_click(Window *win, int x, int y) {
+    // File items start at y=64 relative to window
+    int content_start_y = 64;
+    int offset_x = 4;
+    
+    for (int i = 0; i < item_count; i++) {
+        int row = i / EXPLORER_COLS;
+        int col = i % EXPLORER_COLS;
+        
+        int item_x = offset_x + 10 + (col * (EXPLORER_ITEM_WIDTH + EXPLORER_PADDING));
+        int item_y = content_start_y + (row * (EXPLORER_ITEM_HEIGHT + EXPLORER_PADDING));
+        
+        if (x >= item_x && x < item_x + EXPLORER_ITEM_WIDTH &&
+            y >= item_y && y < item_y + EXPLORER_ITEM_HEIGHT) {
+            
+            // Right-click on a file item
+            if (!items[i].is_directory) {
+                // Show context menu
+                file_context_menu_visible = true;
+                file_context_menu_item = i;
+                file_context_menu_x = x;
+                file_context_menu_y = y;
+                return;
+            }
+        }
+    }
+    
+    // Close menu if clicking elsewhere
+    file_context_menu_visible = false;
+    file_context_menu_item = -1;
+}
+
+static void explorer_handle_file_context_menu_click(Window *win, int x, int y) {
+    (void)win;  // Suppress unused warning - we use absolute coordinates instead
+    
+    if (!file_context_menu_visible || file_context_menu_item < 0) {
+        return;
+    }
+    
+    // Adjust coordinates to be relative to context menu
+    int relative_x = x - file_context_menu_x;
+    int relative_y = y - file_context_menu_y;
+    
+    if (relative_x < 0 || relative_x > FILE_CONTEXT_MENU_WIDTH ||
+        relative_y < 0 || relative_y > FILE_CONTEXT_MENU_HEIGHT) {
+        // Clicked outside menu - close it
+        file_context_menu_visible = false;
+        file_context_menu_item = -1;
+        return;
+    }
+    
+    int item_height = FILE_CONTEXT_MENU_HEIGHT / FILE_CONTEXT_ITEMS;
+    int clicked_item = relative_y / item_height;
+    
+    // Build full path
+    char full_path[256];
+    explorer_strcpy(full_path, current_path);
+    if (full_path[explorer_strlen(full_path) - 1] != '/') {
+        explorer_strcat(full_path, "/");
+    }
+    explorer_strcat(full_path, items[file_context_menu_item].name);
+    
+    if (clicked_item == 0) {
+        // "Open with Text Editor"
+        win_editor.visible = true;
+        win_editor.focused = true;
+        int max_z = 0;
+        if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
+        if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
+        if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
+        if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
+        if (win_markdown.z_index > max_z) max_z = win_markdown.z_index;
+        win_editor.z_index = max_z + 1;
+        editor_open_file(full_path);
+    } else if (clicked_item == 1 && explorer_is_markdown_file(items[file_context_menu_item].name)) {
+        // "Open with Markdown Viewer"
+        win_markdown.visible = true;
+        win_markdown.focused = true;
+        int max_z = 0;
+        if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
+        if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
+        if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
+        if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
+        if (win_editor.z_index > max_z) max_z = win_editor.z_index;
+        win_markdown.z_index = max_z + 1;
+        markdown_open_file(full_path);
+    }
+    
+    file_context_menu_visible = false;
+    file_context_menu_item = -1;
+}
+
 // === Initialization ===
 
 void explorer_init(void) {
@@ -692,7 +861,7 @@ void explorer_init(void) {
     win_explorer.paint = explorer_paint;
     win_explorer.handle_key = explorer_handle_key;
     win_explorer.handle_click = explorer_handle_click;
-    win_explorer.handle_right_click = NULL;
+    win_explorer.handle_right_click = explorer_handle_right_click;
     
     explorer_load_directory("/");
 }
