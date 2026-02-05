@@ -181,6 +181,47 @@ static void itoa(int n, char *buf) {
     }
 }
 
+// --- History ---
+#define HISTORY_MAX 16
+static char cmd_history[HISTORY_MAX][CMD_COLS + 1];
+static int history_head = 0;
+static int history_len = 0;
+static int history_pos = -1;
+static char history_save_buf[CMD_COLS + 1];
+
+static void cmd_history_add(const char *cmd) {
+    if (!cmd || !*cmd) return;
+    
+    // Don't add if same as last command
+    int last_idx = (history_head - 1 + HISTORY_MAX) % HISTORY_MAX;
+    if (history_len > 0 && cmd_strcmp(cmd, cmd_history[last_idx]) == 0) {
+        return;
+    }
+
+    cmd_strcpy(cmd_history[history_head], cmd);
+    history_head = (history_head + 1) % HISTORY_MAX;
+    if (history_len < HISTORY_MAX) history_len++;
+}
+
+static void cmd_clear_line_content(void) {
+    int prompt_len = cmd_strlen(PROMPT);
+    for (int i = prompt_len; i < CMD_COLS; i++) {
+        screen_buffer[cursor_row][i].c = ' ';
+        screen_buffer[cursor_row][i].color = current_color;
+    }
+    cursor_col = prompt_len;
+}
+
+static void cmd_set_line_content(const char *str) {
+    cmd_clear_line_content();
+    while (*str && cursor_col < CMD_COLS) {
+        screen_buffer[cursor_row][cursor_col].c = *str;
+        screen_buffer[cursor_row][cursor_col].color = current_color;
+        cursor_col++;
+        str++;
+    }
+}
+
 // Manual and license pages are now in the individual command files
 
 // --- Terminal Emulation ---
@@ -770,13 +811,46 @@ static void cmd_key(Window *target, char c) {
 
          cmd_putchar('\n');
          
+         if (len > 0) cmd_history_add(cmd_buf);
+         history_pos = -1;
+         
          cmd_exec(cmd_buf);
          
          cmd_write(PROMPT);
     } else if (c == 17) { // UP
-        // History not implemented
+        if (history_len > 0) {
+            if (history_pos == -1) {
+                // Save current line
+                int len = 0;
+                int prompt_len = cmd_strlen(PROMPT);
+                for (int i = prompt_len; i < CMD_COLS; i++) {
+                    char ch = screen_buffer[cursor_row][i].c;
+                    if (ch == 0) break;
+                    history_save_buf[len++] = ch;
+                }
+                while (len > 0 && history_save_buf[len-1] == ' ') len--;
+                history_save_buf[len] = 0;
+                
+                history_pos = (history_head - 1 + HISTORY_MAX) % HISTORY_MAX;
+            } else {
+                int oldest = (history_head - history_len + HISTORY_MAX) % HISTORY_MAX;
+                if (history_pos != oldest) {
+                    history_pos = (history_pos - 1 + HISTORY_MAX) % HISTORY_MAX;
+                }
+            }
+            cmd_set_line_content(cmd_history[history_pos]);
+        }
     } else if (c == 18) { // DOWN
-        
+        if (history_pos != -1) {
+            int newest = (history_head - 1 + HISTORY_MAX) % HISTORY_MAX;
+            if (history_pos == newest) {
+                history_pos = -1;
+                cmd_set_line_content(history_save_buf);
+            } else {
+                history_pos = (history_pos + 1) % HISTORY_MAX;
+                cmd_set_line_content(cmd_history[history_pos]);
+            }
+        }
     } else if (c == 19) { // LEFT
         if (cursor_col > (int)cmd_strlen(PROMPT)) {
             cursor_col--;
