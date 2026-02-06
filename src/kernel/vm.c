@@ -23,6 +23,7 @@ static int stack[VM_STACK_SIZE];
 static unsigned long int rand_next = 1;
 static int sp = 0;
 static uint8_t memory[VM_MEMORY_SIZE]; // 64KB Linear RAM
+static int vm_heap_ptr = 8192;
 
 // --- Graphics Overlay Support ---
 typedef struct {
@@ -62,6 +63,7 @@ static void mem_write32(int addr, int val) {
 static void vm_reset(void) {
     sp = 0;
     cli_memset(memory, 0, VM_MEMORY_SIZE);
+    vm_heap_ptr = 8192;
 }
 
 static void push(int val) {
@@ -189,11 +191,10 @@ static void vm_syscall(int id) {
         // Let's implement a dummy malloc that returns an index into memory
         // Starting at 1024 (reserve first 1K for globals)
         case SYS_MALLOC: {
-            static int heap_ptr = 1024;
             int size = pop();
-            int res = heap_ptr;
-            heap_ptr += size;
-            if (heap_ptr >= VM_MEMORY_SIZE) {
+            int res = vm_heap_ptr;
+            vm_heap_ptr += size;
+            if (vm_heap_ptr >= VM_MEMORY_SIZE) {
                 push(0); // OOM
             } else {
                 push(res);
@@ -305,6 +306,7 @@ static void vm_syscall(int id) {
             if (addr >= 0 && addr < VM_MEMORY_SIZE) {
                 cli_itoa(val, (char*)&memory[addr]);
             }
+            push(0);
             break;
         }
         case SYS_PEEK: push(mem_read32(pop())); break;
@@ -312,6 +314,7 @@ static void vm_syscall(int id) {
             int val = pop();
             int addr = pop();
             mem_write32(addr, val);
+            push(0);
             break;
         }
         case SYS_EXEC: pop(); push(-1); break; // Not impl

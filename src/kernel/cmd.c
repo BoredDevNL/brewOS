@@ -1026,14 +1026,30 @@ static void create_test_files(void) {
     
     fh = fat32_open("Apps/wordofgod.c", "w");
     if (fh) {
-        const char *content = 
-            "int main() {\n"
-            "    // Word of god (inspired by TempleOS (RIP Terry Davis)\n "
-            "    puts(\"Word of God:\\n\");\n"            
-            "    print_int(rand());\n"
-            "    puts(\"\\n\");\n"
-            "}\n";
-        fat32_write(fh, (void *)content, cmd_strlen(content));
+        char *h = "int main(){int l;l=malloc(400);";
+        fat32_write(fh, h, cmd_strlen(h));
+        char *w1 = "poke(l+0,\"In\");poke(l+4,\"the\");poke(l+8,\"beginning\");poke(l+12,\"God\");poke(l+16,\"created\");poke(l+20,\"heaven\");poke(l+24,\"and\");poke(l+28,\"earth\");poke(l+32,\"light\");poke(l+36,\"darkness\");";
+        fat32_write(fh, w1, cmd_strlen(w1));
+        char *w2 = "poke(l+40,\"day\");poke(l+44,\"night\");poke(l+48,\"waters\");poke(l+52,\"firmament\");poke(l+56,\"evening\");poke(l+60,\"morning\");poke(l+64,\"land\");poke(l+68,\"seas\");poke(l+72,\"grass\");poke(l+76,\"herb\");";
+        fat32_write(fh, w2, cmd_strlen(w2));
+        char *w3 = "poke(l+80,\"seed\");poke(l+84,\"fruit\");poke(l+88,\"tree\");poke(l+92,\"sun\");poke(l+96,\"moon\");poke(l+100,\"stars\");poke(l+104,\"signs\");poke(l+108,\"seasons\");poke(l+112,\"days\");poke(l+116,\"years\");";
+        fat32_write(fh, w3, cmd_strlen(w3));
+        char *w4 = "poke(l+120,\"creature\");poke(l+124,\"life\");poke(l+128,\"fowl\");poke(l+132,\"whales\");poke(l+136,\"cattle\");poke(l+140,\"creeping\");poke(l+144,\"beast\");poke(l+148,\"man\");poke(l+152,\"image\");poke(l+156,\"likeness\");";
+        fat32_write(fh, w4, cmd_strlen(w4));
+        char *w5 = "poke(l+160,\"dominion\");poke(l+164,\"fish\");poke(l+168,\"air\");poke(l+172,\"every\");poke(l+176,\"green\");poke(l+180,\"meat\");poke(l+184,\"holy\");poke(l+188,\"rest\");poke(l+192,\"dust\");poke(l+196,\"breath\");";
+        fat32_write(fh, w5, cmd_strlen(w5));
+        char *w6 = "poke(l+200,\"soul\");poke(l+204,\"garden\");poke(l+208,\"east\");poke(l+212,\"Eden\");poke(l+216,\"ground\");poke(l+220,\"sight\");poke(l+224,\"good\");poke(l+228,\"evil\");poke(l+232,\"river\");poke(l+236,\"gold\");";
+        fat32_write(fh, w6, cmd_strlen(w6));
+        char *w7 = "poke(l+240,\"stone\");poke(l+244,\"woman\");poke(l+248,\"wife\");poke(l+252,\"flesh\");poke(l+256,\"bone\");poke(l+260,\"naked\");poke(l+264,\"serpent\");poke(l+268,\"subtle\");poke(l+272,\"eat\");poke(l+276,\"eyes\");";
+        fat32_write(fh, w7, cmd_strlen(w7));
+        char *w8 = "poke(l+280,\"wise\");poke(l+284,\"cool\");poke(l+288,\"voice\");poke(l+292,\"fear\");poke(l+296,\"hid\");poke(l+300,\"cursed\");poke(l+304,\"belly\");poke(l+308,\"enmity\");poke(l+312,\"sorrow\");poke(l+316,\"conception\");";
+        fat32_write(fh, w8, cmd_strlen(w8));
+        char *w9 = "poke(l+320,\"children\");poke(l+324,\"desire\");poke(l+328,\"husband\");poke(l+332,\"thorns\");poke(l+336,\"thistles\");poke(l+340,\"sweat\");poke(l+344,\"bread\");poke(l+348,\"mother\");poke(l+352,\"skin\");poke(l+356,\"coats\");";
+        fat32_write(fh, w9, cmd_strlen(w9));
+        char *w10 = "poke(l+360,\"cherubims\");poke(l+364,\"sword\");poke(l+368,\"gate\");poke(l+372,\"offering\");poke(l+376,\"respect\");poke(l+380,\"sin\");poke(l+384,\"door\");poke(l+388,\"blood\");poke(l+392,\"brother\");poke(l+396,\"keeper\");";
+        fat32_write(fh, w10, cmd_strlen(w10));
+        char *e = "int c;int r;r=rand();r=r-(r/3)*3;c=5+r;int i;i=0;while(i<c){int x;x=rand();x=x-(x/100)*100;int w;w=peek(l+x*4);print_str(w);print_str(\" \");i=i+1;}print_str(\"\\n\");}";
+        fat32_write(fh, e, cmd_strlen(e));
         fat32_close(fh);
     }
 }

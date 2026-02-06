@@ -9,7 +9,7 @@
 
 #define VM_MAGIC "BREWEXE"
 #define VM_STACK_SIZE 256
-#define VM_MEMORY_SIZE (64 * 1024) // 64KB RAM
+#define VM_MEMORY_SIZE (64 * 1024) // 64KB
 
 typedef enum {
     OP_HALT = 0,
