@@ -91,6 +91,9 @@ $(ISO_IMAGE): $(KERNEL_ELF) limine.cfg limine-setup
 	
 	# Copy README
 	cp README.md $(ISO_DIR)/
+
+	# Copy user file.c if it exists
+	@if [ -f file.c ]; then cp file.c $(ISO_DIR)/; fi
 	
 	# Copy Wallpaper (if it exists)
 	@if [ -f src/kernel/wallpaper.ppm ]; then cp src/kernel/wallpaper.ppm $(ISO_DIR)/; fi

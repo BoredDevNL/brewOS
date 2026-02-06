@@ -19,6 +19,9 @@ static int mx = 400, my = 300; // Mouse Pos
 static int prev_mx = 400, prev_my = 300; // Previous mouse position
 static bool start_menu_open = false;
 
+// Hook definition
+void (*wm_custom_paint_hook)(void) = NULL;
+
 // Dragging State
 static bool is_dragging = false;
 static Window *drag_window = NULL;
@@ -328,6 +331,11 @@ void wm_paint(void) {
         // Power options at bottom
         draw_string(8, menu_y + 175, "Shutdown", COLOR_BLACK);
         draw_string(8, menu_y + 195, "Restart", COLOR_BLACK);
+    }
+    
+    // Custom Overlay (VM Graphics)
+    if (wm_custom_paint_hook) {
+        wm_custom_paint_hook();
     }
     
     // 7. Mouse cursor (draw last so it's on top)

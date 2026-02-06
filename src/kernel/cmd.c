@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "network.h"
+#include "vm.h"
 
 #define CMD_COLS 116
 #define CMD_ROWS 41
@@ -476,6 +477,8 @@ static const CommandEntry commands[] = {
     {"udptest", cli_cmd_udptest},
     {"PCILIST", cli_cmd_pcilist},
     {"pcilist", cli_cmd_pcilist},
+    {"COMPC", cli_cmd_cc},
+    {"compc", cli_cmd_cc},
     {NULL, NULL}
 };
 
@@ -496,6 +499,31 @@ static const char* find_pipe(const char* cmd) {
 static void cmd_exec_single(char *cmd) {
     while (*cmd == ' ') cmd++;
     if (!*cmd) return;
+
+    // Check for file execution ./filename
+    if (cmd[0] == '.' && cmd[1] == '/') {
+        char *filename = cmd + 2;
+        FAT32_FileHandle *fh = fat32_open(filename, "r");
+        if (fh) {
+            // It's a file, try to execute it
+            // Limit executable size to 4KB for now
+            uint8_t buffer[4096];
+            int size = fat32_read(fh, buffer, 4096);
+            fat32_close(fh);
+            
+            if (size > 0) {
+                int res = vm_exec(buffer, size);
+                if (res != 0) {
+                     cmd_write("Execution failed.\n");
+                }
+            } else {
+                cmd_write("Error: Empty file.\n");
+            }
+        } else {
+            cmd_write("Error: Command not found or file does not exist.\n");
+        }
+        return;
+    }
 
     // Split cmd and args
     char *args = cmd;
@@ -882,6 +910,7 @@ static void create_test_files(void) {
     fat32_mkdir("Documents");
     fat32_mkdir("Projects");
     fat32_mkdir("Documents/Important");
+    fat32_mkdir("Apps");
     
     FAT32_FileHandle *fh = fat32_open("README.md", "w");
     if (fh) {
@@ -987,18 +1016,24 @@ static void create_test_files(void) {
         fat32_write(fh, (void *)content, 39);
         fat32_close(fh);
     }
-           
-    fh = fat32_open("Documents/notes.txt", "w");
-    if (fh) {
-        const char *content = "My Notes\n\n- First note\n- Second note\n";
-        fat32_write(fh, (void *)content, 39);
-        fat32_close(fh);
-    }
     
     fh = fat32_open("Projects/project1.txt", "w");
     if (fh) {
         const char *content = "Project 1\n\nStatus: In Progress\n";
         fat32_write(fh, (void *)content, 32);
+        fat32_close(fh);
+    }
+    
+    fh = fat32_open("Apps/wordofgod.c", "w");
+    if (fh) {
+        const char *content = 
+            "int main() {\n"
+            "    // Word of god (inspired by TempleOS (RIP Terry Davis)\n "
+            "    puts(\"Word of God:\\n\");\n"            
+            "    print_int(rand());\n"
+            "    puts(\"\\n\");\n"
+            "}\n";
+        fat32_write(fh, (void *)content, cmd_strlen(content));
         fat32_close(fh);
     }
 }

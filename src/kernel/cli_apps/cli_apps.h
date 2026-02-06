@@ -47,4 +47,7 @@ void cli_cmd_udptest(char *args);
 // PCI commands
 void cli_cmd_pcilist(char *args);
 
+// Compiler
+void cli_cmd_cc(char *args);
+
 #endif

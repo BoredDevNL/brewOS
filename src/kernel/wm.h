@@ -52,6 +52,9 @@ void wm_refresh(void);
 void wm_paint(void);
 void wm_timer_tick(void);
 
+// Hook for external rendering (e.g. VM overlay)
+extern void (*wm_custom_paint_hook)(void);
+
 // Drawing helpers
 void draw_bevel_rect(int x, int y, int w, int h, bool sunken);
 void draw_button(int x, int y, int w, int h, const char *text, bool pressed);
