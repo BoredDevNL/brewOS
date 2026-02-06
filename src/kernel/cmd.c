@@ -45,41 +45,6 @@ static void fs_init() {
     }
 }
 
-static RamFile* fs_find(const char *name) {
-    for (int i = 0; i < FS_MAX_FILES; i++) {
-        if (ram_fs[i].used) {
-            // Simple strcmp
-            const char *a = ram_fs[i].name;
-            const char *b = name;
-            bool match = true;
-            while (*a && *b) {
-                if (*a != *b) { match = false; break; }
-                a++; b++;
-            }
-            if (match && *a == *b) return &ram_fs[i];
-        }
-    }
-    return NULL;
-}
-
-static RamFile* fs_create(const char *name) {
-    if (fs_find(name)) return fs_find(name);
-    for (int i = 0; i < FS_MAX_FILES; i++) {
-        if (!ram_fs[i].used) {
-            ram_fs[i].used = true;
-            int j = 0;
-            while (name[j] && j < FS_MAX_FILENAME - 1) {
-                ram_fs[i].name[j] = name[j];
-                j++;
-            }
-            ram_fs[i].name[j] = 0;
-            ram_fs[i].size = 0;
-            return &ram_fs[i];
-        }
-    }
-    return NULL;
-}
-
 // --- Structs ---
 typedef struct {
     char c;
@@ -115,11 +80,6 @@ static char redirect_mode = 0;  // '>' for write, 'a' for append, 0 for normal o
 int boot_year, boot_month, boot_day, boot_hour, boot_min, boot_sec;
 
 // --- Helpers ---
-static void cmd_memset(void *dest, int val, size_t len) {
-    unsigned char *ptr = dest;
-    while (len-- > 0) *ptr++ = val;
-}
-
 static size_t cmd_strlen(const char *str) {
     size_t len = 0;
     while (str[len]) len++;
@@ -139,22 +99,6 @@ static void cmd_strcpy(char *dest, const char *src) {
     *dest = 0;
 }
 
-static int cmd_atoi(const char *str) {
-    int res = 0;
-    int sign = 1;
-    if (*str == '-') { sign = -1; str++; }
-    while (*str >= '0' && *str <= '9') {
-        res = res * 10 + (*str - '0');
-        str++;
-    }
-    return res * sign;
-}
-
-static void brewing(int iterations) {
-    for (volatile int i = 0; i < iterations; i++) {
-        __asm__ __volatile__("nop");
-    }
-}
 
 static void itoa(int n, char *buf) {
     if (n == 0) {
@@ -402,6 +346,42 @@ static const CommandEntry commands[] = {
     {"memvalid", cli_cmd_memvalid},
     {"MEMTEST", cli_cmd_memtest},
     {"memtest", cli_cmd_memtest},
+<<<<<<< Updated upstream
+=======
+    // Network Commands
+    {"NETINIT", cli_cmd_netinit},
+    {"netinit", cli_cmd_netinit},
+    {"NETINFO", cli_cmd_netinfo},
+    {"netinfo", cli_cmd_netinfo},
+    {"IPSET", cli_cmd_ipset},
+    {"ipset", cli_cmd_ipset},
+    {"UDPSEND", cli_cmd_udpsend},
+    {"udpsend", cli_cmd_udpsend},
+    {"UDPTEST", cli_cmd_udptest},
+    {"udptest", cli_cmd_udptest},
+    {"PCILIST", cli_cmd_pcilist},
+    {"pcilist", cli_cmd_pcilist},
+    {"PING", cli_cmd_ping},
+    {"ping", cli_cmd_ping},
+    {"DNS", cli_cmd_dns},
+    {"dns", cli_cmd_dns},
+    {"DIG", cli_cmd_dns},
+    {"dig", cli_cmd_dns},
+    {"DNSSET", cli_cmd_dnsset},
+    {"dnsset", cli_cmd_dnsset},
+    {"GWSET", cli_cmd_gwset},
+    {"gwset", cli_cmd_gwset},
+    {"MASKSET", cli_cmd_maskset},
+    {"maskset", cli_cmd_maskset},
+    {"HTTPGET", cli_cmd_httpget},
+    {"httpget", cli_cmd_httpget},
+    {"MSGRC", cli_cmd_msgrc},
+    {"msgrc", cli_cmd_msgrc},
+    {"COMPC", cli_cmd_cc},
+    {"compc", cli_cmd_cc},
+    {"CC", cli_cmd_cc},
+    {"cc", cli_cmd_cc},
+>>>>>>> Stashed changes
     {NULL, NULL}
 };
 

@@ -37,4 +37,27 @@ void cli_cmd_memblock(char *args);
 void cli_cmd_memvalid(char *args);
 void cli_cmd_memtest(char *args);
 
+<<<<<<< Updated upstream
+=======
+// Network commands
+void cli_cmd_netinit(char *args);
+void cli_cmd_netinfo(char *args);
+void cli_cmd_ipset(char *args);
+void cli_cmd_udpsend(char *args);
+void cli_cmd_udptest(char *args);
+void cli_cmd_msgrc(char *args);
+void cli_cmd_ping(char *args);
+void cli_cmd_dns(char *args);
+void cli_cmd_dnsset(char *args);
+void cli_cmd_gwset(char *args);
+void cli_cmd_maskset(char *args);
+void cli_cmd_httpget(char *args);
+
+// PCI commands
+void cli_cmd_pcilist(char *args);
+
+// Compiler
+void cli_cmd_cc(char *args);
+
+>>>>>>> Stashed changes
 #endif
