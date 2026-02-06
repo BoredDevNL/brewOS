@@ -275,3 +275,116 @@ void cli_cmd_touch(char *args) {
     cli_write(filename);
     cli_write("\n");
 }
+
+void cli_cmd_cp(char *args) {
+    char *src = args;
+    while (*src == ' ') src++;
+    
+    char *dest = src;
+    while (*dest && *dest != ' ') dest++;
+    
+    if (*dest) {
+        *dest = 0;
+        dest++;
+        while (*dest == ' ') dest++;
+    }
+    
+    if (!*src || !*dest) {
+        cli_write("Usage: cp <source> <dest>\n");
+        return;
+    }
+    
+    // Check if dest is a directory
+    char final_dest[256];
+    cli_strcpy(final_dest, dest);
+    
+    if (fat32_is_directory(dest)) {
+        // Append filename from src to dest
+        int len = cli_strlen(final_dest);
+        if (len > 0 && final_dest[len-1] != '/') {
+            final_dest[len++] = '/';
+            final_dest[len] = 0;
+        }
+        
+        // Extract filename from src
+        const char *fname = src;
+        const char *p = src;
+        while (*p) {
+            if (*p == '/') fname = p + 1;
+            p++;
+        }
+        
+        // Append
+        int j = 0;
+        while (fname[j]) {
+            final_dest[len++] = fname[j++];
+        }
+        final_dest[len] = 0;
+    }
+    
+    FAT32_FileHandle *fh_in = fat32_open(src, "r");
+    if (!fh_in) {
+        cli_write("Error: Cannot open source file: ");
+        cli_write(src);
+        cli_write("\n");
+        return;
+    }
+    
+    FAT32_FileHandle *fh_out = fat32_open(final_dest, "w");
+    if (!fh_out) {
+        cli_write("Error: Cannot create destination file: ");
+        cli_write(final_dest);
+        cli_write("\n");
+        fat32_close(fh_in);
+        return;
+    }
+    
+    char buffer[4096];
+    int bytes;
+    while ((bytes = fat32_read(fh_in, buffer, sizeof(buffer))) > 0) {
+        fat32_write(fh_out, buffer, bytes);
+    }
+    
+    fat32_close(fh_in);
+    fat32_close(fh_out);
+    
+    cli_write("Copied ");
+    cli_write(src);
+    cli_write(" to ");
+    cli_write(final_dest);
+    cli_write("\n");
+}
+
+void cli_cmd_mv(char *args) {
+    // Parse args similar to cp
+    char *src = args;
+    while (*src == ' ') src++;
+    
+    char *dest = src;
+    while (*dest && *dest != ' ') dest++;
+    
+    if (*dest) {
+        *dest = 0;
+        dest++;
+        while (*dest == ' ') dest++;
+    }
+    
+    if (!*src || !*dest) {
+        cli_write("Usage: mv <source> <dest>\n");
+        return;
+    }
+    
+
+    char cp_args[512];
+    int i = 0;
+    const char *s = src;
+    while (*s) cp_args[i++] = *s++;
+    cp_args[i++] = ' ';
+    const char *d = dest;
+    while (*d) cp_args[i++] = *d++;
+    cp_args[i] = 0;
+    
+    cli_cmd_cp(cp_args);
+
+    fat32_delete(src);
+}

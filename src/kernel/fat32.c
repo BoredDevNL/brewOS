@@ -108,28 +108,63 @@ static void extract_parent_path(const char *path, char *parent) {
 
 // Normalize path (remove .., ., etc)
 void fat32_normalize_path(const char *path, char *normalized) {
+    char temp[FAT32_MAX_PATH];
+    int temp_len = 0;
+
+    // Initialize with current directory or root
     if (path[0] == '/') {
-        // Absolute path
-        fs_strcpy(normalized, path);
+        temp[0] = '/';
+        temp[1] = 0;
+        temp_len = 1;
     } else {
-        // Relative path - prepend current directory
-        if (fs_strcmp(current_dir, "/") == 0) {
-            normalized[0] = '/';
-            fs_strcpy(normalized + 1, path);
-        } else {
-            fs_strcpy(normalized, current_dir);
-            if (normalized[fs_strlen(normalized) - 1] != '/') {
-                fs_strcat(normalized, "/");
+        fs_strcpy(temp, current_dir);
+        temp_len = fs_strlen(temp);
+    }
+
+    int i = 0;
+    while (path[i]) {
+        // Skip separators
+        while (path[i] == '/') i++;
+        if (!path[i]) break;
+
+        // Extract component
+        char component[256];
+        int j = 0;
+        while (path[i] && path[i] != '/' && j < 255) {
+            component[j++] = path[i++];
+        }
+        component[j] = 0;
+
+        if (fs_strcmp(component, ".") == 0) {
+            continue;
+        } else if (fs_strcmp(component, "..") == 0) {
+            // Go up one level
+            if (temp_len > 1) { // Not root
+                while (temp_len > 0 && temp[temp_len - 1] != '/') {
+                    temp_len--;
+                }
+                if (temp_len > 1) { // Remove trailing slash if not root
+                    temp_len--;
+                }
+                temp[temp_len] = 0;
             }
-            fs_strcat(normalized, path);
+        } else {
+            // Append component
+            if (temp[temp_len - 1] != '/') {
+                temp[temp_len++] = '/';
+                temp[temp_len] = 0;
+            }
+            fs_strcat(temp, component);
+            temp_len = fs_strlen(temp);
         }
     }
     
     // Remove trailing slashes (except for root)
-    int len = fs_strlen(normalized);
-    while (len > 1 && normalized[len - 1] == '/') {
-        normalized[--len] = 0;
+    if (temp_len > 1 && temp[temp_len - 1] == '/') {
+        temp[--temp_len] = 0;
     }
+    
+    fs_strcpy(normalized, temp);
 }
 
 // Find file entry by path

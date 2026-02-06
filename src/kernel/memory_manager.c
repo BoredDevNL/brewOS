@@ -3,8 +3,10 @@
 #include <stdint.h>
 
 // --- Internal State ---
-static uint8_t *memory_pool = NULL;  // Dynamically allocated
-static size_t memory_pool_size = DEFAULT_POOL_SIZE;  // Track actual pool size
+#define KERNEL_HEAP_SIZE (32 * 1024 * 1024) // 32MB Static Heap
+static uint8_t memory_pool_buffer[KERNEL_HEAP_SIZE];
+static uint8_t *memory_pool = memory_pool_buffer;
+static size_t memory_pool_size = KERNEL_HEAP_SIZE;
 static MemBlock block_list[MAX_ALLOCATIONS];
 static int block_count = 0;
 static size_t total_allocated = 0;
@@ -119,14 +121,6 @@ static size_t calculate_fragmentation(void) {
 void memory_manager_init_with_size(size_t pool_size) {
     if (initialized) return;
     
-    memory_pool_size = pool_size;
-    
-    // Initialize memory pool - in a real kernel, this would be passed a physical address
-    // For now, we use a simple tracking mechanism where allocations are tracked virtually
-    // The caller is responsible for ensuring the pool_size is valid
-    if (memory_pool == NULL) {
-        memory_pool = (uint8_t *)0x100000000;  // Start from 4GB boundary as virtual tracking
-    }
     
     // Clear metadata
     mem_memset(block_list, 0, sizeof(block_list));

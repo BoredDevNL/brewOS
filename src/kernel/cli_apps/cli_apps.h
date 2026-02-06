@@ -28,6 +28,8 @@ void cli_cmd_rm(char *args);
 void cli_cmd_echo(char *args);
 void cli_cmd_cat(char *args);
 void cli_cmd_touch(char *args);
+void cli_cmd_cp(char *args);
+void cli_cmd_mv(char *args);
 
 // Memory management commands
 void cli_cmd_meminfo(char *args);

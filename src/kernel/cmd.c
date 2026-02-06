@@ -451,6 +451,10 @@ static const CommandEntry commands[] = {
     {"cat", cli_cmd_cat},
     {"TOUCH", cli_cmd_touch},
     {"touch", cli_cmd_touch},
+    {"CP", cli_cmd_cp},
+    {"cp", cli_cmd_cp},
+    {"MV", cli_cmd_mv},
+    {"mv", cli_cmd_mv},
     // Memory Management Commands
     {"MEMINFO", cli_cmd_meminfo},
     {"meminfo", cli_cmd_meminfo},
@@ -479,6 +483,8 @@ static const CommandEntry commands[] = {
     {"pcilist", cli_cmd_pcilist},
     {"COMPC", cli_cmd_cc},
     {"compc", cli_cmd_cc},
+    {"CC", cli_cmd_cc},
+    {"cc", cli_cmd_cc},
     {NULL, NULL}
 };
 
@@ -539,6 +545,38 @@ static void cmd_exec_single(char *cmd) {
             commands[i].func(args);
             return;
         }
+    }
+
+    // Check for executable in /Apps/
+    char app_path[256];
+    char *p = app_path;
+    const char *prefix = "/Apps/";
+    while (*prefix) *p++ = *prefix++;
+    char *c = cmd;
+    while (*c) *p++ = *c++;
+    *p = 0;
+
+    FAT32_FileHandle *app_fh = fat32_open(app_path, "r");
+    if (app_fh) {
+        uint8_t *app_buffer = (uint8_t*)kmalloc(VM_MEMORY_SIZE);
+        if (app_buffer) {
+            int size = fat32_read(app_fh, app_buffer, VM_MEMORY_SIZE);
+            fat32_close(app_fh);
+            
+            if (size > 0) {
+                int res = vm_exec(app_buffer, size);
+                if (res != 0) {
+                     cmd_write("Execution failed (invalid format or runtime error).\n");
+                }
+            } else {
+                cmd_write("Error: Empty file.\n");
+            }
+            kfree(app_buffer);
+        } else {
+            fat32_close(app_fh);
+            cmd_write("Error: Out of memory.\n");
+        }
+        return;
     }
 
     cmd_write("Unknown command: ");
