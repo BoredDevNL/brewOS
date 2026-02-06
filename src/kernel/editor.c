@@ -312,8 +312,10 @@ static void editor_paint(Window *win) {
         int text_len = lines[line_idx].length;
         int char_idx = 0;
         int local_display_line = 0;
+        bool first_pass = true;
         
-        while (char_idx < text_len && display_line < max_display_lines) {
+        while ((char_idx < text_len || (text_len == 0 && first_pass)) && display_line < max_display_lines) {
+            first_pass = false;
             int current_display_y = offset_y + 35 + display_line * EDITOR_LINE_HEIGHT;
             
             // Extract segment (up to max_chars_per_line)
@@ -353,9 +355,18 @@ static void editor_paint(Window *win) {
             }
             
             // Draw cursor if on this line and wrapped segment
-            if (line_idx == cursor_line && cursor_col >= segment_start && cursor_col < segment_start + segment_len) {
-                int cursor_x = text_start_x + ((cursor_col - segment_start) * EDITOR_CHAR_WIDTH);
-                draw_rect(cursor_x, current_display_y, 2, 10, COLOR_BLACK);
+            if (line_idx == cursor_line) {
+                int segment_end = segment_start + segment_len;
+                bool draw_cursor = false;
+                if (cursor_col >= segment_start && cursor_col < segment_end) {
+                    draw_cursor = true;
+                } else if (cursor_col == text_len && segment_end == text_len) {
+                    draw_cursor = true;
+                }
+                if (draw_cursor) {
+                    int cursor_x = text_start_x + ((cursor_col - segment_start) * EDITOR_CHAR_WIDTH);
+                    draw_rect(cursor_x, current_display_y, 2, 10, COLOR_BLACK);
+                }
             }
             
             display_line++;

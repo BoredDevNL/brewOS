@@ -2,22 +2,18 @@
 # Target Architecture: x86_64
 # Host: macOS
 
-# Toolchain Definitions
 CC = x86_64-elf-gcc
 LD = x86_64-elf-ld
 NASM = nasm
 XORRISO = xorriso
 
-# Directories
 SRC_DIR = src/kernel
 BUILD_DIR = build
 ISO_DIR = iso_root
 
-# Output
 KERNEL_ELF = $(BUILD_DIR)/brewos.elf
 ISO_IMAGE = brewos.iso
 
-# Source Files
 C_SOURCES = $(wildcard $(SRC_DIR)/*.c)
 CLI_APP_SOURCES = $(wildcard $(SRC_DIR)/cli_apps/*.c)
 ASM_SOURCES = $(wildcard $(SRC_DIR)/*.asm)
@@ -25,7 +21,6 @@ OBJ_FILES = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(C_SOURCES)) \
             $(patsubst $(SRC_DIR)/cli_apps/%.c, $(BUILD_DIR)/cli_apps/%.o, $(CLI_APP_SOURCES)) \
             $(patsubst $(SRC_DIR)/%.asm, $(BUILD_DIR)/%.o, $(ASM_SOURCES))
 
-# Flags
 CFLAGS = -g -O2 -pipe -Wall -Wextra -std=gnu11 -ffreestanding \
          -fno-stack-protector -fno-stack-check -fno-lto -fPIE \
          -m64 -march=x86-64 -mno-80387 -mno-mmx -mno-sse -mno-sse2 -mno-red-zone \
@@ -123,4 +118,4 @@ clean:
 run: $(ISO_IMAGE)
 	qemu-system-x86_64 -m 2G -serial stdio -cdrom $(ISO_IMAGE) -boot d \
 		-audiodev coreaudio,id=audio0 -machine pcspk-audiodev=audio0 \
-		-netdev user,id=net0 -device e1000,netdev=net0
+		-netdev user,id=net0,hostfwd=udp::12345-:12345 -device e1000,netdev=net0

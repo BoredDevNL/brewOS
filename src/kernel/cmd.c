@@ -119,6 +119,17 @@ static char pipe_buffer[8192];
 static int pipe_buffer_pos = 0;
 int boot_year, boot_month, boot_day, boot_hour, boot_min, boot_sec;
 
+// Message notification state
+static int msg_count = 0;
+
+void cmd_increment_msg_count(void) {
+    msg_count++;
+}
+
+void cmd_reset_msg_count(void) {
+    msg_count = 0;
+}
+
 // --- Helpers ---
 static void cmd_memset(void *dest, int val, size_t len) {
     unsigned char *ptr = dest;
@@ -481,6 +492,8 @@ static const CommandEntry commands[] = {
     {"udptest", cli_cmd_udptest},
     {"PCILIST", cli_cmd_pcilist},
     {"pcilist", cli_cmd_pcilist},
+    {"MSGRC", cli_cmd_msgrc},
+    {"msgrc", cli_cmd_msgrc},
     {"COMPC", cli_cmd_cc},
     {"compc", cli_cmd_cc},
     {"CC", cli_cmd_cc},
@@ -941,6 +954,11 @@ void cmd_reset(void) {
     // Reset terminal to fresh state
     cmd_screen_clear();
     cmd_write("BrewOS Command Prompt\n");
+    if (msg_count > 0) {
+        cmd_write("You have ");
+        cmd_write_int(msg_count);
+        cmd_write(" new message(s) run \"msgrc\" to see your new message(s).\n");
+    }
     cmd_write(PROMPT);
 }
 
@@ -1046,6 +1064,15 @@ static void create_test_files(void) {
         fat32_close(fh);
     }
     
+    fh = fat32_open("Apps/README.md", "w");
+    if (fh) {
+        const char *content = 
+            "# All compiled C files in this directory are openable from any other directory by typing in the name of the compiled file by typing in the name of the compiled file.\n\n"            
+            "The c file 'wordofgod.c' contains a C program similar to one in TempleOS, which Terry A. Davis (RIP) saw as 'words from god' telling him what to do with his kernel.\n"
+            "I made this file as a tribute to him, as he also inspired me to create this project in '24. If you want to run it you simply do cc (or compc) wordofgod.c and then run ./wordofgod \n";
+        fat32_write(fh, (void *)content, cmd_strlen(content));
+        fat32_close(fh);
+    }    
     write_license_file();
     
     fh = fat32_open("Documents/notes.txt", "w");
@@ -1061,6 +1088,7 @@ static void create_test_files(void) {
         fat32_write(fh, (void *)content, 32);
         fat32_close(fh);
     }
+   
     
     fh = fat32_open("Apps/wordofgod.c", "w");
     if (fh) {

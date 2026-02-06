@@ -1,5 +1,6 @@
 #include "cli_utils.h"
 #include "fat32.h"
+#include "cmd.h"
 
 void cli_cmd_cd(char *args) {
     if (!args || args[0] == 0) {
@@ -221,6 +222,10 @@ void cli_cmd_cat(char *args) {
         i++;
     }
     filename[i] = 0;
+
+    if (cli_strcmp(filename, "messages") == 0) {
+        cmd_reset_msg_count();
+    }    
     
     FAT32_FileHandle *fh = fat32_open(filename, "r");
     if (!fh) {

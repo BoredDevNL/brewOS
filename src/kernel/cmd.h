@@ -14,4 +14,7 @@ void cmd_putchar(char c);
 void cmd_write_int(int n);
 void cmd_screen_clear(void);
 
+void cmd_increment_msg_count(void);
+void cmd_reset_msg_count(void);
+
 #endif

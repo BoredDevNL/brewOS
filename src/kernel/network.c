@@ -106,6 +106,11 @@ void network_process_frames(void){
                     if(for_our_ip || ip->dest_ip[0]==255){
                         mac_address_t src_mac;
                         kmemcpy(src_mac.bytes,eth->src_mac,6);
+                        
+                        ipv4_address_t src_ip_struct;
+                        kmemcpy(src_ip_struct.bytes, ip->src_ip, 4);
+                        arp_cache_add(&src_ip_struct, &src_mac);
+                        
                         ipv4_process_packet(ip,&src_mac,payload_length);
                     }
                 }

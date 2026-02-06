@@ -1,5 +1,8 @@
 #include "cli_utils.h"
 #include "network.h"
+#include "fat32.h"
+#include "cmd.h"
+#include "memory_manager.h"
 
 static void print_mac(const mac_address_t* mac){
     char buf[64];
@@ -97,11 +100,35 @@ void cli_cmd_udpsend(char *args){
 
 static void udp_print_callback(const ipv4_address_t* src_ip,uint16_t src_port,const mac_address_t* src_mac,const void* data,size_t length){
     (void)src_mac;
-    cli_write("UDP from ");
-    for(int i=0;i<4;i++){ cli_write_int(src_ip->bytes[i]); if(i<3) cli_write("."); }
-    cli_write(":"); cli_write_int(src_port); cli_write(" ");
-    for(size_t i=0;i<length;i++){ cli_putchar(((const char*)data)[i]); }
-    cli_write("\n");
+    
+    FAT32_FileHandle *fh = fat32_open("messages", "a");
+    if (fh) {
+        char buf[32];
+        fat32_write(fh, "UDP from ", 9);
+        
+        // Write IP
+        for(int i=0;i<4;i++){ 
+            cli_itoa(src_ip->bytes[i], buf);
+            fat32_write(fh, buf, cli_strlen(buf));
+            if(i<3) fat32_write(fh, ".", 1);
+        }
+        
+        fat32_write(fh, ":", 1);
+        
+        // Write Port
+        cli_itoa(src_port, buf);
+        fat32_write(fh, buf, cli_strlen(buf));
+        
+        fat32_write(fh, " ", 1);
+        
+        // Write Message
+        fat32_write(fh, data, length);
+        fat32_write(fh, "\n", 1);
+        
+        fat32_close(fh);
+        
+        cmd_increment_msg_count();
+    }
 }
 
 void cli_cmd_udptest(char *args){
@@ -109,4 +136,55 @@ void cli_cmd_udptest(char *args){
     int port=cli_atoi(args);
     if(port<=0||port>65535){ cli_write("Invalid port\n"); return; }
     if(udp_register_callback((uint16_t)port,udp_print_callback)==0) cli_write("UDP callback registered\n"); else cli_write("Register failed\n");
+}
+
+void cli_cmd_msgrc(char *args) {
+    (void)args;
+    // Reset message count since we are viewing them
+    cmd_reset_msg_count();
+
+    FAT32_FileHandle *fh = fat32_open("messages", "r");
+    if (!fh) {
+        cli_write("No messages.\n");
+        return;
+    }
+
+    uint32_t size = fh->size;
+    if (size == 0) {
+        fat32_close(fh);
+        cli_write("No messages.\n");
+        return;
+    }
+
+    char *buffer = (char*)kmalloc(size + 1);
+    if (!buffer) {
+        fat32_close(fh);
+        cli_write("Error: Out of memory\n");
+        return;
+    }
+
+    fat32_read(fh, buffer, size);
+    buffer[size] = 0;
+    fat32_close(fh);
+
+    int count = 0;
+    int pos = size - 1;
+
+    while (count < 10 && pos >= 0) {
+        // Skip trailing newlines/whitespace
+        while (pos >= 0 && (buffer[pos] == '\n' || buffer[pos] == '\r')) {
+            buffer[pos] = 0; 
+            pos--;
+        }
+        if (pos < 0) break;
+
+        // Find start of line
+        while (pos >= 0 && buffer[pos] != '\n' && buffer[pos] != '\r') pos--;
+        
+        cli_write(&buffer[pos + 1]);
+        cli_write("\n");
+        count++;
+    }
+
+    kfree(buffer);
 }

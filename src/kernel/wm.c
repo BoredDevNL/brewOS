@@ -377,6 +377,7 @@ void wm_handle_click(int x, int y) {
             if (y < menu_y + 25) { // Explorer
                 win_explorer.visible = true;
                 win_explorer.focused = true;
+                explorer_reset();
                 // Bring to front
                 int max_z = 0;
                 for (int i = 0; i < window_count; i++) {
@@ -411,6 +412,7 @@ void wm_handle_click(int x, int y) {
             } else if (y < menu_y + 85) { // CMD
                 win_cmd.visible = true;
                 win_cmd.focused = true;
+                cmd_reset();
                 int max_z = 0;
                 for (int i = 0; i < window_count; i++) {
                     if (all_windows[i]->z_index > max_z) {
