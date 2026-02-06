@@ -78,6 +78,7 @@ typedef struct {
 // File Handle
 typedef struct {
     uint32_t cluster;               // Current cluster
+    uint32_t start_cluster;         // Start cluster (for file entry lookup)
     uint32_t position;              // Current position in file
     uint32_t size;                  // File size
     uint32_t mode;                  // 0=read, 1=write, 2=append

@@ -6,11 +6,11 @@
 #include "../cmd.h"
 
 // --- Compiler Limits ---
-#define MAX_SOURCE 8192
-#define MAX_TOKENS 2048
-#define MAX_VARS 64 
-#define CODE_SIZE 4096
-#define STR_POOL_SIZE 2048
+#define MAX_SOURCE 65536
+#define MAX_TOKENS 16384
+#define MAX_VARS 512
+#define CODE_SIZE 32768
+#define STR_POOL_SIZE 16384
 
 static int compile_error = 0;
 
@@ -312,7 +312,7 @@ typedef struct {
 static Symbol symbols[MAX_VARS];
 static int symbol_count = 0;
 
-static int next_var_addr = 4096;
+static int next_var_addr = 32768;
 
 static int find_symbol(const char *name) {
     for (int i = 0; i < symbol_count; i++) {
@@ -629,19 +629,27 @@ void cli_cmd_cc(char *args) {
         return;
     }
     
-    char source[MAX_SOURCE];
+    char *source = (char*)kmalloc(MAX_SOURCE);
+    if (!source) {
+        cmd_write("Error: Out of memory for source buffer.\n");
+        fat32_close(fh);
+        return;
+    }
+
     int len = fat32_read(fh, source, MAX_SOURCE - 1);
     source[len] = 0;
     fat32_close(fh);
 
     lexer(source);
+    kfree(source);
+
     if (compile_error) return;
     
     code_pos = 0;
     symbol_count = 0;
     cur_token = 0;
     str_pool_pos = 0;
-    next_var_addr = 4096; 
+    next_var_addr = 32768; 
     
     const char* magic = VM_MAGIC;
     for(int i=0; i<7; i++) emit(magic[i]);

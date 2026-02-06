@@ -273,6 +273,7 @@ FAT32_FileHandle* fat32_open(const char *path, const char *mode) {
     
     handle->valid = true;
     handle->cluster = entry->start_cluster;
+    handle->start_cluster = entry->start_cluster;
     handle->position = 0;
     handle->size = entry->size;
     
@@ -283,6 +284,17 @@ FAT32_FileHandle* fat32_open(const char *path, const char *mode) {
     } else {
         handle->mode = 2;  // append
         handle->position = entry->size;
+        
+        // Walk to the correct cluster for the current position
+        uint32_t current_cluster = handle->start_cluster;
+        uint32_t pos = 0;
+        while (pos + FAT32_CLUSTER_SIZE <= handle->position) {
+             uint32_t next = fat_table[current_cluster];
+             if (next >= 0xFFFFFFF8) break; 
+             current_cluster = next;
+             pos += FAT32_CLUSTER_SIZE;
+        }
+        handle->cluster = current_cluster;
     }
     
     return handle;
@@ -342,8 +354,18 @@ int fat32_write(FAT32_FileHandle *handle, const void *buffer, int size) {
     
     int bytes_written = 0;
     const uint8_t *buf = (const uint8_t *)buffer;
-    uint32_t initial_cluster = handle->cluster;
     
+    // Check if we are at a cluster boundary from a previous write
+    if (handle->position > 0 && (handle->position % FAT32_CLUSTER_SIZE) == 0) {
+         uint32_t next = fat_table[handle->cluster];
+         if (next >= 0xFFFFFFF8) {
+             next = allocate_cluster();
+             if (!next) return 0;
+             fat_table[handle->cluster] = next;
+         }
+         handle->cluster = next;
+    }
+
     while (bytes_written < size) {
         uint32_t offset_in_cluster = handle->position % FAT32_CLUSTER_SIZE;
         int to_write = size - bytes_written;
@@ -379,7 +401,7 @@ int fat32_write(FAT32_FileHandle *handle, const void *buffer, int size) {
     
     // Update file entry
     for (int i = 0; i < MAX_FILES; i++) {
-        if (files[i].used && files[i].start_cluster == initial_cluster) {
+        if (files[i].used && files[i].start_cluster == handle->start_cluster) {
             files[i].size = handle->size;
             break;
         }
