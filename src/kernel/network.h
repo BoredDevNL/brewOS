@@ -81,5 +81,7 @@ int network_get_e1000_receive_calls(void);
 int network_get_e1000_receive_empty(void);
 int network_get_process_calls(void);
 int network_dhcp_acquire(void);
+int network_get_gateway_ip(ipv4_address_t* ip);
+int network_get_dns_ip(ipv4_address_t* ip);
 
 #endif

@@ -682,7 +682,13 @@ void wm_handle_right_click(int x, int y) {
     prev_left = left;
 }
 
-void wm_handle_key(char c) {
+// Input Queue
+#define INPUT_QUEUE_SIZE 128
+static char key_queue[INPUT_QUEUE_SIZE];
+static volatile int key_head = 0;
+static volatile int key_tail = 0;
+
+static void wm_dispatch_key(char c) {
     Window *target = NULL;
     if (win_notepad.focused && win_notepad.visible) target = &win_notepad;
     else if (win_cmd.focused && win_cmd.visible) target = &win_cmd;
@@ -700,6 +706,22 @@ void wm_handle_key(char c) {
     
     // Mark window as needing redraw on next timer tick
     wm_mark_dirty(target->x, target->y, target->w, target->h);
+}
+
+void wm_handle_key(char c) {
+    int next = (key_head + 1) % INPUT_QUEUE_SIZE;
+    if (next != key_tail) {
+        key_queue[key_head] = c;
+        key_head = next;
+    }
+}
+
+void wm_process_input(void) {
+    while (key_head != key_tail) {
+        char c = key_queue[key_tail];
+        key_tail = (key_tail + 1) % INPUT_QUEUE_SIZE;
+        wm_dispatch_key(c);
+    }
 }
 
 void wm_mark_dirty(int x, int y, int w, int h) {

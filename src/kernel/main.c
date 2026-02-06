@@ -103,6 +103,7 @@ void kmain(void) {
     // 5. Main loop - just wait for interrupts
     // Timer interrupt will drive the redraw system
     while (1) {
+        wm_process_input();
         asm("hlt");
     }
 }

@@ -3,10 +3,15 @@
 #include "network.h"
 #include "e1000.h"
 #include "pci.h"
+#undef IP_PROTO_UDP // Avoid redefinition warning from net_defs.h
+#include "net_defs.h"
 
 static int network_initialized = 0;
 static mac_address_t our_mac;
 static ipv4_address_t ip_address = {{0,0,0,0}};
+static ipv4_address_t gateway_ip = {{0,0,0,0}};
+static ipv4_address_t subnet_mask = {{0,0,0,0}};
+static ipv4_address_t dns_server_ip = {{0,0,0,0}};
 static uint16_t ipv4_id_counter = 0;
 
 typedef struct { ipv4_address_t ip; mac_address_t mac; uint32_t timestamp; int valid; } arp_cache_entry_t;
@@ -28,10 +33,6 @@ static int network_process_calls = 0;
 static void* kmemcpy(void* d, const void* s, size_t n){uint8_t*D=d;const uint8_t*S=s;for(size_t i=0;i<n;i++)D[i]=S[i];return d;}
 static void* kmemset(void* d,int v,size_t n){uint8_t*D=d;for(size_t i=0;i<n;i++)D[i]=(uint8_t)v;return d;}
 static int kmemcmp(const void* a,const void* b,size_t n){const uint8_t*A=a;const uint8_t*B=b;for(size_t i=0;i<n;i++){if(A[i]!=B[i])return (int)A[i]-(int)B[i];}return 0;}
-
-static uint16_t htons(uint16_t x){return (uint16_t)(((x&0xFF)<<8)|((x>>8)&0xFF));}
-static uint16_t ntohs(uint16_t x){return htons(x);}
-static uint32_t htonl(uint32_t v){return ((v&0xFF)<<24)|((v&0xFF00)<<8)|((v>>8)&0xFF00)|((v>>24)&0xFF);}
 
 static uint16_t ipv4_checksum(const ipv4_header_t* h){
     uint32_t sum=0;const uint16_t* w=(const uint16_t*)h;
@@ -65,6 +66,20 @@ int network_get_mac_address(mac_address_t* mac){
 
 int network_get_ipv4_address(ipv4_address_t* ip){ if(!network_initialized) return -1; *ip=ip_address; return 0; }
 int network_set_ipv4_address(const ipv4_address_t* ip){ if(!network_initialized) return -1; ip_address=*ip; return 0; }
+
+int network_get_gateway_ip(ipv4_address_t* ip){ if(!network_initialized) return -1; *ip=gateway_ip; return 0; }
+int network_get_dns_ip(ipv4_address_t* ip){ if(!network_initialized) return -1; *ip=dns_server_ip; return 0; }
+
+ipv4_address_t get_local_ip(void) {
+    return ip_address;
+}
+ipv4_address_t get_dns_server_ip(void) {
+    return dns_server_ip;
+}
+
+int ip_send_packet(ipv4_address_t dst, uint8_t protocol, const void *data, uint16_t len) {
+    return ipv4_send_packet(&dst, protocol, data, len);
+}
 
 int network_send_frame(const void* data,size_t length){ if(!network_initialized) return -1; if(length>ETH_FRAME_MAX_SIZE) return -1; return e1000_send_packet(data,length); }
 
@@ -185,8 +200,34 @@ int ipv4_send_packet(const ipv4_address_t* dest_ip,uint8_t protocol,const void* 
     if(!network_initialized) return -1;
     mac_address_t dest_mac;
     int is_bcast=(dest_ip->bytes[0]==255 && dest_ip->bytes[1]==255 && dest_ip->bytes[2]==255 && dest_ip->bytes[3]==255);
-    if(is_bcast){ for(int i=0;i<6;i++) dest_mac.bytes[i]=0xFF; }
-    else { int ok=arp_lookup(dest_ip,&dest_mac); if(ok!=0){ for(int i=0;i<6;i++) dest_mac.bytes[i]=0xFF; } }
+    
+    ipv4_address_t target_ip = *dest_ip;
+    
+    // Routing Logic: If dest is not local, send to Gateway
+    if (!is_bcast && gateway_ip.bytes[0] != 0 && subnet_mask.bytes[0] != 0) {
+        int is_local = 1;
+        for(int i=0; i<4; i++) {
+            if ((dest_ip->bytes[i] & subnet_mask.bytes[i]) != (ip_address.bytes[i] & subnet_mask.bytes[i])) {
+                is_local = 0;
+                break;
+            }
+        }
+        if (!is_local) {
+            target_ip = gateway_ip;
+        }
+    }
+
+    if(is_bcast){ 
+        for(int i=0;i<6;i++) dest_mac.bytes[i]=0xFF; 
+    } else { 
+        int ok=arp_lookup(&target_ip,&dest_mac); 
+        if(ok!=0){ 
+            // ARP failed, maybe broadcast? Or fail? 
+            // For now, keep existing behavior of broadcasting if ARP fails
+            for(int i=0;i<6;i++) dest_mac.bytes[i]=0xFF; 
+        } 
+    }
+    
     uint8_t frame[ETH_FRAME_MAX_SIZE];
     eth_header_t* eth=(eth_header_t*)frame;
     ipv4_header_t* ip=(ipv4_header_t*)(frame+sizeof(eth_header_t));
@@ -263,6 +304,14 @@ void ipv4_process_packet(const ipv4_header_t* ip,const mac_address_t* src_mac,si
                 }
             }
         }
+    } else if (ip->protocol == IP_PROTO_ICMP) {
+        ipv4_address_t src_ip;
+        kmemcpy(src_ip.bytes, ip->src_ip, 4);
+        icmp_handle_packet(src_ip, payload, payload_length);
+    } else if (ip->protocol == IP_PROTO_TCP) {
+        ipv4_address_t src_ip;
+        kmemcpy(src_ip.bytes, ip->src_ip, 4);
+        tcp_handle_packet(src_ip, payload, payload_length);
     }
 }
 
@@ -330,6 +379,9 @@ int network_get_process_calls(void){ return network_process_calls; }
 #define DHCP_OPT_MSG_TYPE 53
 #define DHCP_OPT_SERVER_ID 54
 #define DHCP_OPT_REQ_IP 50
+#define DHCP_OPT_SUBNET_MASK 1
+#define DHCP_OPT_ROUTER 3
+#define DHCP_OPT_DNS 6
 #define DHCP_OPT_PARAM_REQ_LIST 55
 #define DHCP_OPT_END 255
 
@@ -414,6 +466,24 @@ static void dhcp_udp_callback(const ipv4_address_t* src_ip,uint16_t src_port,con
         ip_address.bytes[1]=(uint8_t)((yi_host>>16)&0xFF);
         ip_address.bytes[2]=(uint8_t)((yi_host>>8)&0xFF);
         ip_address.bytes[3]=(uint8_t)(yi_host&0xFF);
+        
+        // Parse Options for Gateway, Subnet, DNS
+        const uint8_t* p=pkt->options;
+        while(*p!=DHCP_OPT_END){ 
+            uint8_t c=*p++; 
+            uint8_t l=*p++; 
+            if(c==DHCP_OPT_SUBNET_MASK && l==4) {
+                kmemcpy(subnet_mask.bytes, p, 4);
+            } else if(c==DHCP_OPT_ROUTER && l>=4) {
+                // Take first router
+                kmemcpy(gateway_ip.bytes, p, 4);
+            } else if(c==DHCP_OPT_DNS && l>=4) {
+                // Take first DNS
+                kmemcpy(dns_server_ip.bytes, p, 4);
+            }
+            p+=l; 
+        }
+        
         dhcp_state=2;
     } else if(mtype==DHCP_MSG_NAK){
         dhcp_state=-1;

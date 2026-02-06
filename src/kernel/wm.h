@@ -45,6 +45,7 @@ void wm_handle_mouse(int dx, int dy, uint8_t buttons);
 void wm_handle_key(char c);
 void wm_handle_click(int x, int y);
 void wm_handle_right_click(int x, int y);
+void wm_process_input(void);
 
 // Redraw system
 void wm_mark_dirty(int x, int y, int w, int h);

@@ -15,6 +15,7 @@
 #include <stddef.h>
 #include "network.h"
 #include "vm.h"
+#include "net_defs.h"
 
 #define CMD_COLS 116
 #define CMD_ROWS 41
@@ -26,61 +27,6 @@
 
 #define TXT_BUFFER_SIZE 4096
 #define TXT_VISIBLE_LINES (CMD_ROWS - 2)
-
-#define FS_MAX_FILES 16
-#define FS_MAX_FILENAME 64
-#define FS_MAX_SIZE 4096
-
-typedef struct {
-    char name[FS_MAX_FILENAME];
-    char content[FS_MAX_SIZE];
-    int size;
-    bool used;
-} RamFile;
-
-static RamFile ram_fs[FS_MAX_FILES];
-
-static void fs_init() {
-    for (int i = 0; i < FS_MAX_FILES; i++) {
-        ram_fs[i].used = false;
-        ram_fs[i].size = 0;
-    }
-}
-
-static RamFile* fs_find(const char *name) {
-    for (int i = 0; i < FS_MAX_FILES; i++) {
-        if (ram_fs[i].used) {
-            // Simple strcmp
-            const char *a = ram_fs[i].name;
-            const char *b = name;
-            bool match = true;
-            while (*a && *b) {
-                if (*a != *b) { match = false; break; }
-                a++; b++;
-            }
-            if (match && *a == *b) return &ram_fs[i];
-        }
-    }
-    return NULL;
-}
-
-static RamFile* fs_create(const char *name) {
-    if (fs_find(name)) return fs_find(name);
-    for (int i = 0; i < FS_MAX_FILES; i++) {
-        if (!ram_fs[i].used) {
-            ram_fs[i].used = true;
-            int j = 0;
-            while (name[j] && j < FS_MAX_FILENAME - 1) {
-                ram_fs[i].name[j] = name[j];
-                j++;
-            }
-            ram_fs[i].name[j] = 0;
-            ram_fs[i].size = 0;
-            return &ram_fs[i];
-        }
-    }
-    return NULL;
-}
 
 // --- Structs ---
 typedef struct {
@@ -131,11 +77,6 @@ void cmd_reset_msg_count(void) {
 }
 
 // --- Helpers ---
-static void cmd_memset(void *dest, int val, size_t len) {
-    unsigned char *ptr = dest;
-    while (len-- > 0) *ptr++ = val;
-}
-
 static size_t cmd_strlen(const char *str) {
     size_t len = 0;
     while (str[len]) len++;
@@ -153,23 +94,6 @@ static int cmd_strcmp(const char *s1, const char *s2) {
 static void cmd_strcpy(char *dest, const char *src) {
     while (*src) *dest++ = *src++;
     *dest = 0;
-}
-
-static int cmd_atoi(const char *str) {
-    int res = 0;
-    int sign = 1;
-    if (*str == '-') { sign = -1; str++; }
-    while (*str >= '0' && *str <= '9') {
-        res = res * 10 + (*str - '0');
-        str++;
-    }
-    return res * sign;
-}
-
-static void brewing(int iterations) {
-    for (volatile int i = 0; i < iterations; i++) {
-        __asm__ __volatile__("nop");
-    }
 }
 
 static void itoa(int n, char *buf) {
@@ -490,6 +414,12 @@ static const CommandEntry commands[] = {
     {"udpsend", cli_cmd_udpsend},
     {"UDPTEST", cli_cmd_udptest},
     {"udptest", cli_cmd_udptest},
+    {"PING", cli_cmd_ping},
+    {"ping", cli_cmd_ping},
+    {"DNS", cli_cmd_dns},
+    {"dns", cli_cmd_dns},
+    {"HTTPGET", cli_cmd_httpget},
+    {"httpget", cli_cmd_httpget},
     {"PCILIST", cli_cmd_pcilist},
     {"pcilist", cli_cmd_pcilist},
     {"MSGRC", cli_cmd_msgrc},
@@ -1121,7 +1051,6 @@ static void create_test_files(void) {
 }
 
 void cmd_init(void) {
-    fs_init(); // Init RAMFS
     fat32_init(); // Init FAT32 filesystem
     create_test_files();
 
