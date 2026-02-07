@@ -859,7 +859,7 @@ static void control_panel_handle_click(Window *win, int x, int y) {
             }
         }
         if (x >= offset_x + 180 && x < offset_x + 200 && y >= section_y && y < section_y + 20) {
-            if (desktop_max_cols < 20) desktop_max_cols++;
+            desktop_max_cols++;
             wm_refresh_desktop();
         }
     }
