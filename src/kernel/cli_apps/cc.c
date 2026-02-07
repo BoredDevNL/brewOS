@@ -618,19 +618,9 @@ static void program() {
 }
 
 void cli_cmd_cc(char *args) {
-    // Skip leading whitespace
-    while (args && *args == ' ') args++;
-
     if (!args || !*args) {
         cmd_write("Usage: cc <filename.c>\n");
         return;
-    }
-
-    // Trim trailing whitespace
-    int len = cli_strlen(args);
-    while (len > 0 && (args[len-1] == ' ' || args[len-1] == '\t' || args[len-1] == '\n')) {
-        args[len-1] = 0;
-        len--;
     }
 
     FAT32_FileHandle *fh = fat32_open(args, "r");
@@ -646,8 +636,8 @@ void cli_cmd_cc(char *args) {
         return;
     }
 
-    int read_len = fat32_read(fh, source, MAX_SOURCE - 1);
-    source[read_len] = 0;
+    int len = fat32_read(fh, source, MAX_SOURCE - 1);
+    source[len] = 0;
     fat32_close(fh);
 
     lexer(source);

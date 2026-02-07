@@ -328,45 +328,6 @@ void pager_set_mode(void) {
     current_mode = MODE_PAGER;
 }
 
-// Internal LS command to avoid stack overflow in external module
-static void internal_cmd_ls(char *args) {
-    char path[256];
-    if (args && *args) {
-        int i=0;
-        while(args[i] && i < 255) { path[i] = args[i]; i++; }
-        path[i] = 0;
-    } else {
-        path[0] = '.'; path[1] = 0;
-    }
-
-    int max_files = 64;
-    FAT32_FileInfo *files = (FAT32_FileInfo*)kmalloc(max_files * sizeof(FAT32_FileInfo));
-    if (!files) {
-        cmd_write("Error: Out of memory\n");
-        return;
-    }
-
-    int count = fat32_list_directory(path, files, max_files);
-    
-    for (int i = 0; i < count; i++) {
-        if (files[i].is_directory) {
-            cmd_write("[DIR]  ");
-        } else {
-            cmd_write("[FILE] ");
-        }
-        
-        cmd_write(files[i].name);
-        if (!files[i].is_directory) {
-            cmd_write(" ");
-            cmd_write_int(files[i].size);
-            cmd_write("b");
-        }
-        cmd_write("\n");
-    }
-    
-    kfree(files);
-}
-
 // --- Commands (now delegated to cli_apps/) ---
 
 // Command dispatch table
@@ -413,8 +374,8 @@ static const CommandEntry commands[] = {
     {"cd", cli_cmd_cd},
     {"PWD", cli_cmd_pwd},
     {"pwd", cli_cmd_pwd},
-    {"LS", internal_cmd_ls},
-    {"ls", internal_cmd_ls},
+    {"LS", cli_cmd_ls},
+    {"ls", cli_cmd_ls},
     {"MKDIR", cli_cmd_mkdir},
     {"mkdir", cli_cmd_mkdir},
     {"RM", cli_cmd_rm},
@@ -934,14 +895,12 @@ void cmd_reset(void) {
 }
 
 static void create_test_files(void) {
-    if (!fat32_exists("Documents")) fat32_mkdir("Documents");
-    if (!fat32_exists("Projects")) fat32_mkdir("Projects");
-    if (!fat32_exists("Documents/Important")) fat32_mkdir("Documents/Important");
-    if (!fat32_exists("Apps")) fat32_mkdir("Apps");
+    fat32_mkdir("Documents");
+    fat32_mkdir("Projects");
+    fat32_mkdir("Documents/Important");
+    fat32_mkdir("Apps");
     
-    FAT32_FileHandle *fh;
-    // Always try to write README to ensure content exists (fixes empty file issue)
-    fh = fat32_open("README.md", "w");
+    FAT32_FileHandle *fh = fat32_open("README.md", "w");
     if (fh) {
         const char *content = 
             "# Brew OS 1.01 Alpha\n\n"
@@ -1033,8 +992,8 @@ static void create_test_files(void) {
             "The above attribution requirements are informational and intended to\n"
             "ensure proper credit is given. They do not alter or supersede the\n"
             "terms of the GNU General Public License (GPL), which governs this work.\n";
-            fat32_write(fh, (void *)content, cmd_strlen(content));
-            fat32_close(fh);
+        fat32_write(fh, (void *)content, cmd_strlen(content));
+        fat32_close(fh);
     }
     
     fh = fat32_open("Apps/README.md", "w");
@@ -1042,7 +1001,7 @@ static void create_test_files(void) {
         const char *content = 
             "# All compiled C files in this directory are openable from any other directory by typing in the name of the compiled file by typing in the name of the compiled file.\n\n"            
             "The c file 'wordofgod.c' contains a C program similar to one in TempleOS, which Terry A. Davis (RIP) saw as 'words from god' telling him what to do with his kernel.\n"
-            "I made this file as a tribute to him, as he also inspired me to create this project in '24. If you want to run it you simply do cc (or compc) wordgod.c and then run ./wordgod \n";
+            "I made this file as a tribute to him, as he also inspired me to create this project in '24. If you want to run it you simply do cc (or compc) wordofgod.c and then run ./wordofgod \n";
         fat32_write(fh, (void *)content, cmd_strlen(content));
         fat32_close(fh);
     }    
@@ -1065,59 +1024,73 @@ static void create_test_files(void) {
     
     fh = fat32_open("Apps/wordofgod.c", "w");
     if (fh) {
-        // Buffer the entire file content to write in one go
-        // This prevents issues with multiple small writes causing truncation
-        char *buf = (char*)kmalloc(8192);
-        if (buf) {
-            int p = 0;
-            const char *strs[] = {
-                "int main(){int l;l=malloc(1200);",
-                "poke(l+0,\"In \");poke(l+4,\"the \");poke(l+8,\"beginning \");poke(l+12,\"God \");poke(l+16,\"created \");poke(l+20,\"heaven \");poke(l+24,\"and \");poke(l+28,\"earth \");poke(l+32,\"light \");poke(l+36,\"darkness \");",
-                "poke(l+40,\"day \");poke(l+44,\"night \");poke(l+48,\"waters \");poke(l+52,\"firmament \");poke(l+56,\"evening \");poke(l+60,\"morning \");poke(l+64,\"land \");poke(l+68,\"seas \");poke(l+72,\"grass \");poke(l+76,\"herb \");",
-                "poke(l+80,\"seed \");poke(l+84,\"fruit \");poke(l+88,\"tree \");poke(l+92,\"sun \");poke(l+96,\"moon \");poke(l+100,\"stars \");poke(l+104,\"signs \");poke(l+108,\"seasons \");poke(l+112,\"days \");poke(l+116,\"years \");",
-                "poke(l+120,\"creature \");poke(l+124,\"life \");poke(l+128,\"fowl \");poke(l+132,\"whales \");poke(l+136,\"cattle \");poke(l+140,\"creeping \");poke(l+144,\"beast \");poke(l+148,\"man \");poke(l+152,\"image \");poke(l+156,\"likeness \");",
-                "poke(l+160,\"dominion \");poke(l+164,\"fish \");poke(l+168,\"air \");poke(l+172,\"every \");poke(l+176,\"CIA \");poke(l+180,\"meat \");poke(l+184,\"holy \");poke(l+188,\"rest \");poke(l+192,\"dust \");poke(l+196,\"breath \");",
-                "poke(l+200,\"soul \");poke(l+204,\"garden \");poke(l+208,\"east \");poke(l+212,\"Eden \");poke(l+216,\"ground \");poke(l+220,\"sight \");poke(l+224,\"good \");poke(l+228,\"evil \");poke(l+232,\"river \");poke(l+236,\"gold \");",
-                "poke(l+240,\"stone \");poke(l+244,\"woman \");poke(l+248,\"wife \");poke(l+252,\"flesh \");poke(l+256,\"bone \");poke(l+260,\"naked \");poke(l+264,\"serpent \");poke(l+268,\"subtle \");poke(l+272,\"eat \");poke(l+276,\"eyes \");",
-                "poke(l+280,\"wise \");poke(l+284,\"cool \");poke(l+288,\"voice \");poke(l+292,\"fear \");poke(l+296,\"hid \");poke(l+300,\"cursed \");poke(l+304,\"belly \");poke(l+308,\"enmity \");poke(l+312,\"sorrow \");poke(l+316,\"conception \");",
-                "poke(l+320,\"children \");poke(l+324,\"desire \");poke(l+328,\"husband \");poke(l+332,\"thorns \");poke(l+336,\"thistles \");poke(l+340,\"sweat \");poke(l+344,\"bread \");poke(l+348,\"mother \");poke(l+352,\"skin \");poke(l+356,\"coats \");",
-                "poke(l+360,\"cherubims \");poke(l+364,\"sword \");poke(l+368,\"gate \");poke(l+372,\"offering \");poke(l+376,\"respect \");poke(l+380,\"sin \");poke(l+384,\"door \");poke(l+388,\"blood \");poke(l+392,\"brother \");poke(l+396,\"keeper \");",
-                "poke(l+400,\"voice \");poke(l+404,\"heard \");poke(l+408,\"walking \");poke(l+412,\"cool \");poke(l+416,\"day \");poke(l+420,\"where \");poke(l+424,\"art \");poke(l+428,\"thou \");poke(l+432,\"told \");poke(l+436,\"thee \");",
-                "poke(l+440,\"hast \");poke(l+444,\"eaten \");poke(l+448,\"tree \");poke(l+452,\"whereof \");poke(l+456,\"commanded \");poke(l+460,\"shouldest \");poke(l+464,\"not \");poke(l+468,\"eat \");poke(l+472,\"gave \");poke(l+476,\"me \");",
-                "poke(l+480,\"beguiled \");poke(l+484,\"belly \");poke(l+488,\"go \");poke(l+492,\"dust \");poke(l+496,\"shalt \");poke(l+500,\"eat \");poke(l+504,\"days \");poke(l+508,\"life \");poke(l+512,\"put \");poke(l+516,\"enmity \");",
-                "poke(l+520,\"between \");poke(l+524,\"seed \");poke(l+528,\"bruise \");poke(l+532,\"head \");poke(l+536,\"heel \");poke(l+540,\"multiply \");poke(l+544,\"sorrow \");poke(l+548,\"conception \");poke(l+552,\"forth \");poke(l+556,\"children \");",
-                "poke(l+560,\"desire \");poke(l+564,\"rule \");poke(l+568,\"over \");poke(l+572,\"sake \");poke(l+576,\"sweat \");poke(l+580,\"face \");poke(l+584,\"till \");poke(l+588,\"return \");poke(l+592,\"ground \");poke(l+596,\"taken \");",
-                "poke(l+600,\"mother \");poke(l+604,\"living \");poke(l+608,\"coats \");poke(l+612,\"skins \");poke(l+616,\"clothed \");poke(l+620,\"become \");poke(l+624,\"one \");poke(l+628,\"us \");poke(l+632,\"know \");poke(l+636,\"good \");",
-                "poke(l+640,\"evil \");poke(l+644,\"lest \");poke(l+648,\"put \");poke(l+652,\"hand \");poke(l+656,\"take \");poke(l+660,\"live \");poke(l+664,\"ever \");poke(l+668,\"sent \");poke(l+672,\"garden \");poke(l+676,\"eden \");",
-                "poke(l+680,\"flaming \");poke(l+684,\"sword \");poke(l+688,\"turned \");poke(l+692,\"way \");poke(l+696,\"knew \");poke(l+700,\"conceived \");poke(l+704,\"bare \");poke(l+708,\"cain \");poke(l+712,\"said \");poke(l+716,\"gotten \");",
-                "poke(l+720,\"lord \");poke(l+724,\"again \");poke(l+728,\"abel \");poke(l+732,\"sheep \");poke(l+736,\"tiller \");poke(l+740,\"process \");poke(l+744,\"time \");poke(l+748,\"pass \");poke(l+752,\"brought \");poke(l+756,\"fruit \");",
-                "poke(l+760,\"offering \");poke(l+764,\"firstlings \");poke(l+768,\"flock \");poke(l+772,\"fat \");poke(l+776,\"thereof \");poke(l+780,\"respect \");poke(l+784,\"wroth \");poke(l+788,\"countenance \");poke(l+792,\"fallen \");poke(l+796,\"well \");",
-                "poke(l+800,\"accepted \");poke(l+804,\"not \");poke(l+808,\"sin \");poke(l+812,\"lieth \");poke(l+816,\"door \");poke(l+820,\"unto \");poke(l+824,\"rule \");poke(l+828,\"talked \");poke(l+832,\"field \");poke(l+836,\"rose \");",
-                "poke(l+840,\"slew \");poke(l+844,\"done \");poke(l+848,\"crieth \");poke(l+852,\"mouth \");poke(l+856,\"receive \");poke(l+860,\"strength \");poke(l+864,\"fugitive \");poke(l+868,\"vagabond \");poke(l+872,\"punishment \");poke(l+876,\"greater \");",
-                "poke(l+880,\"bear \");poke(l+884,\"driven \");poke(l+888,\"hid \");poke(l+892,\"findeth \");poke(l+896,\"slay \");poke(l+900,\"vengeance \");poke(l+904,\"sevenfold \");poke(l+908,\"mark \");poke(l+912,\"finding \");poke(l+916,\"kill \");",
-                "poke(l+920,\"presence \");poke(l+924,\"dwelt \");poke(l+928,\"nod \");poke(l+932,\"enoch \");poke(l+936,\"city \");poke(l+940,\"irad \");poke(l+944,\"mehujael \");poke(l+948,\"methusael \");poke(l+952,\"lamech \");poke(l+956,\"adah \");",
-                "poke(l+960,\"zillah \");poke(l+964,\"jabal \");poke(l+968,\"tent \");poke(l+972,\"cattle \");poke(l+976,\"jubal \");poke(l+980,\"harp \");poke(l+984,\"organ \");poke(l+988,\"tubalcain \");poke(l+992,\"brass \");poke(l+996,\"iron \");",
-                "poke(l+1000,\"naamah \");poke(l+1004,\"wives \");poke(l+1008,\"hear \");poke(l+1012,\"speech \");poke(l+1016,\"hearken \");poke(l+1020,\"young \");poke(l+1024,\"hurt \");poke(l+1028,\"wounding \");poke(l+1032,\"avenged \");poke(l+1036,\"seventy \");",
-                "poke(l+1040,\"seth \");poke(l+1044,\"appointed \");poke(l+1048,\"enos \");poke(l+1052,\"began \");poke(l+1056,\"call \");poke(l+1060,\"name \");poke(l+1064,\"generations \");poke(l+1068,\"adam \");poke(l+1072,\"likeness \");poke(l+1076,\"blessed \");",
-                "poke(l+1080,\"begat \");poke(l+1084,\"sons \");poke(l+1088,\"daughters \");poke(l+1092,\"lived \");poke(l+1096,\"died \");poke(l+1100,\"cainan \");poke(l+1104,\"mahalaleel \");poke(l+1108,\"jared \");poke(l+1112,\"walked \");poke(l+1116,\"three \");",
-                "poke(l+1120,\"hundred \");poke(l+1124,\"sixty \");poke(l+1128,\"five \");poke(l+1132,\"methuselah \");poke(l+1136,\"lamech \");poke(l+1140,\"noah \");poke(l+1144,\"comfort \");poke(l+1148,\"work \");poke(l+1152,\"toil \");poke(l+1156,\"hands \");",
-                "poke(l+1160,\"shem \");poke(l+1164,\"ham \");poke(l+1168,\"japheth \");poke(l+1172,\"men \");poke(l+1176,\"daughters \");poke(l+1180,\"born \");poke(l+1184,\"fair \");poke(l+1188,\"chose \");poke(l+1192,\"spirit \");poke(l+1196,\"strive \");",
-                "int c;int r;r=abs(rand());r=r-(r/5)*5;c=14+r;int i;i=0;while(i<c){int x;x=abs(rand());x=x-(x/300)*300;int w;w=peek(l+x*4);print_str(w);i=i+1;}nl();}",
-                NULL
-            };
-            
-            for (int i = 0; strs[i]; i++) {
-                const char *s = strs[i];
-                while (*s && p < 8191) buf[p++] = *s++;
-            }
-            
-            fat32_write(fh, buf, p);
-            kfree(buf);
-        }
+        char *h = "int main(){int l;l=malloc(1200);";
+        fat32_write(fh, h, cmd_strlen(h));
+        char *w1 = "poke(l+0,\"In \");poke(l+4,\"the \");poke(l+8,\"beginning \");poke(l+12,\"God \");poke(l+16,\"created \");poke(l+20,\"heaven \");poke(l+24,\"and \");poke(l+28,\"earth \");poke(l+32,\"light \");poke(l+36,\"darkness \");";
+        fat32_write(fh, w1, cmd_strlen(w1));
+        char *w2 = "poke(l+40,\"day \");poke(l+44,\"night \");poke(l+48,\"waters \");poke(l+52,\"firmament \");poke(l+56,\"evening \");poke(l+60,\"morning \");poke(l+64,\"land \");poke(l+68,\"seas \");poke(l+72,\"grass \");poke(l+76,\"herb \");";
+        fat32_write(fh, w2, cmd_strlen(w2));
+        char *w3 = "poke(l+80,\"seed \");poke(l+84,\"fruit \");poke(l+88,\"tree \");poke(l+92,\"sun \");poke(l+96,\"moon \");poke(l+100,\"stars \");poke(l+104,\"signs \");poke(l+108,\"seasons \");poke(l+112,\"days \");poke(l+116,\"years \");";
+        fat32_write(fh, w3, cmd_strlen(w3));
+        char *w4 = "poke(l+120,\"creature \");poke(l+124,\"life \");poke(l+128,\"fowl \");poke(l+132,\"whales \");poke(l+136,\"cattle \");poke(l+140,\"creeping \");poke(l+144,\"beast \");poke(l+148,\"man \");poke(l+152,\"image \");poke(l+156,\"likeness \");";
+        fat32_write(fh, w4, cmd_strlen(w4));
+        char *w5 = "poke(l+160,\"dominion \");poke(l+164,\"fish \");poke(l+168,\"air \");poke(l+172,\"every \");poke(l+176,\"CIA \");poke(l+180,\"meat \");poke(l+184,\"holy \");poke(l+188,\"rest \");poke(l+192,\"dust \");poke(l+196,\"breath \");";
+        fat32_write(fh, w5, cmd_strlen(w5));
+        char *w6 = "poke(l+200,\"soul \");poke(l+204,\"garden \");poke(l+208,\"east \");poke(l+212,\"Eden \");poke(l+216,\"ground \");poke(l+220,\"sight \");poke(l+224,\"good \");poke(l+228,\"evil \");poke(l+232,\"river \");poke(l+236,\"gold \");";
+        fat32_write(fh, w6, cmd_strlen(w6));
+        char *w7 = "poke(l+240,\"stone \");poke(l+244,\"woman \");poke(l+248,\"wife \");poke(l+252,\"flesh \");poke(l+256,\"bone \");poke(l+260,\"naked \");poke(l+264,\"serpent \");poke(l+268,\"subtle \");poke(l+272,\"eat \");poke(l+276,\"eyes \");";
+        fat32_write(fh, w7, cmd_strlen(w7));
+        char *w8 = "poke(l+280,\"wise \");poke(l+284,\"cool \");poke(l+288,\"voice \");poke(l+292,\"fear \");poke(l+296,\"hid \");poke(l+300,\"cursed \");poke(l+304,\"belly \");poke(l+308,\"enmity \");poke(l+312,\"sorrow \");poke(l+316,\"conception \");";
+        fat32_write(fh, w8, cmd_strlen(w8));
+        char *w9 = "poke(l+320,\"children \");poke(l+324,\"desire \");poke(l+328,\"husband \");poke(l+332,\"thorns \");poke(l+336,\"thistles \");poke(l+340,\"sweat \");poke(l+344,\"bread \");poke(l+348,\"mother \");poke(l+352,\"skin \");poke(l+356,\"coats \");";
+        fat32_write(fh, w9, cmd_strlen(w9));
+        char *w10 = "poke(l+360,\"cherubims \");poke(l+364,\"sword \");poke(l+368,\"gate \");poke(l+372,\"offering \");poke(l+376,\"respect \");poke(l+380,\"sin \");poke(l+384,\"door \");poke(l+388,\"blood \");poke(l+392,\"brother \");poke(l+396,\"keeper \");";
+        fat32_write(fh, w10, cmd_strlen(w10));
+        char *w11 = "poke(l+400,\"voice \");poke(l+404,\"heard \");poke(l+408,\"walking \");poke(l+412,\"cool \");poke(l+416,\"day \");poke(l+420,\"where \");poke(l+424,\"art \");poke(l+428,\"thou \");poke(l+432,\"told \");poke(l+436,\"thee \");";
+        fat32_write(fh, w11, cmd_strlen(w11));
+        char *w12 = "poke(l+440,\"hast \");poke(l+444,\"eaten \");poke(l+448,\"tree \");poke(l+452,\"whereof \");poke(l+456,\"commanded \");poke(l+460,\"shouldest \");poke(l+464,\"not \");poke(l+468,\"eat \");poke(l+472,\"gave \");poke(l+476,\"me \");";
+        fat32_write(fh, w12, cmd_strlen(w12));
+        char *w13 = "poke(l+480,\"beguiled \");poke(l+484,\"belly \");poke(l+488,\"go \");poke(l+492,\"dust \");poke(l+496,\"shalt \");poke(l+500,\"eat \");poke(l+504,\"days \");poke(l+508,\"life \");poke(l+512,\"put \");poke(l+516,\"enmity \");";
+        fat32_write(fh, w13, cmd_strlen(w13));
+        char *w14 = "poke(l+520,\"between \");poke(l+524,\"seed \");poke(l+528,\"bruise \");poke(l+532,\"head \");poke(l+536,\"heel \");poke(l+540,\"multiply \");poke(l+544,\"sorrow \");poke(l+548,\"conception \");poke(l+552,\"forth \");poke(l+556,\"children \");";
+        fat32_write(fh, w14, cmd_strlen(w14));
+        char *w15 = "poke(l+560,\"desire \");poke(l+564,\"rule \");poke(l+568,\"over \");poke(l+572,\"sake \");poke(l+576,\"sweat \");poke(l+580,\"face \");poke(l+584,\"till \");poke(l+588,\"return \");poke(l+592,\"ground \");poke(l+596,\"taken \");";
+        fat32_write(fh, w15, cmd_strlen(w15));
+        char *w16 = "poke(l+600,\"mother \");poke(l+604,\"living \");poke(l+608,\"coats \");poke(l+612,\"skins \");poke(l+616,\"clothed \");poke(l+620,\"become \");poke(l+624,\"one \");poke(l+628,\"us \");poke(l+632,\"know \");poke(l+636,\"good \");";
+        fat32_write(fh, w16, cmd_strlen(w16));
+        char *w17 = "poke(l+640,\"evil \");poke(l+644,\"lest \");poke(l+648,\"put \");poke(l+652,\"hand \");poke(l+656,\"take \");poke(l+660,\"live \");poke(l+664,\"ever \");poke(l+668,\"sent \");poke(l+672,\"garden \");poke(l+676,\"eden \");";
+        fat32_write(fh, w17, cmd_strlen(w17));
+        char *w18 = "poke(l+680,\"flaming \");poke(l+684,\"sword \");poke(l+688,\"turned \");poke(l+692,\"way \");poke(l+696,\"knew \");poke(l+700,\"conceived \");poke(l+704,\"bare \");poke(l+708,\"cain \");poke(l+712,\"said \");poke(l+716,\"gotten \");";
+        fat32_write(fh, w18, cmd_strlen(w18));
+        char *w19 = "poke(l+720,\"lord \");poke(l+724,\"again \");poke(l+728,\"abel \");poke(l+732,\"sheep \");poke(l+736,\"tiller \");poke(l+740,\"process \");poke(l+744,\"time \");poke(l+748,\"pass \");poke(l+752,\"brought \");poke(l+756,\"fruit \");";
+        fat32_write(fh, w19, cmd_strlen(w19));
+        char *w20 = "poke(l+760,\"offering \");poke(l+764,\"firstlings \");poke(l+768,\"flock \");poke(l+772,\"fat \");poke(l+776,\"thereof \");poke(l+780,\"respect \");poke(l+784,\"wroth \");poke(l+788,\"countenance \");poke(l+792,\"fallen \");poke(l+796,\"well \");";
+        fat32_write(fh, w20, cmd_strlen(w20));
+        char *w21 = "poke(l+800,\"accepted \");poke(l+804,\"not \");poke(l+808,\"sin \");poke(l+812,\"lieth \");poke(l+816,\"door \");poke(l+820,\"unto \");poke(l+824,\"rule \");poke(l+828,\"talked \");poke(l+832,\"field \");poke(l+836,\"rose \");";
+        fat32_write(fh, w21, cmd_strlen(w21));
+        char *w22 = "poke(l+840,\"slew \");poke(l+844,\"done \");poke(l+848,\"crieth \");poke(l+852,\"mouth \");poke(l+856,\"receive \");poke(l+860,\"strength \");poke(l+864,\"fugitive \");poke(l+868,\"vagabond \");poke(l+872,\"punishment \");poke(l+876,\"greater \");";
+        fat32_write(fh, w22, cmd_strlen(w22));
+        char *w23 = "poke(l+880,\"bear \");poke(l+884,\"driven \");poke(l+888,\"hid \");poke(l+892,\"findeth \");poke(l+896,\"slay \");poke(l+900,\"vengeance \");poke(l+904,\"sevenfold \");poke(l+908,\"mark \");poke(l+912,\"finding \");poke(l+916,\"kill \");";
+        fat32_write(fh, w23, cmd_strlen(w23));
+        char *w24 = "poke(l+920,\"presence \");poke(l+924,\"dwelt \");poke(l+928,\"nod \");poke(l+932,\"enoch \");poke(l+936,\"city \");poke(l+940,\"irad \");poke(l+944,\"mehujael \");poke(l+948,\"methusael \");poke(l+952,\"lamech \");poke(l+956,\"adah \");";
+        fat32_write(fh, w24, cmd_strlen(w24));
+        char *w25 = "poke(l+960,\"zillah \");poke(l+964,\"jabal \");poke(l+968,\"tent \");poke(l+972,\"cattle \");poke(l+976,\"jubal \");poke(l+980,\"harp \");poke(l+984,\"organ \");poke(l+988,\"tubalcain \");poke(l+992,\"brass \");poke(l+996,\"iron \");";
+        fat32_write(fh, w25, cmd_strlen(w25));
+        char *w26 = "poke(l+1000,\"naamah \");poke(l+1004,\"wives \");poke(l+1008,\"hear \");poke(l+1012,\"speech \");poke(l+1016,\"hearken \");poke(l+1020,\"young \");poke(l+1024,\"hurt \");poke(l+1028,\"wounding \");poke(l+1032,\"avenged \");poke(l+1036,\"seventy \");";
+        fat32_write(fh, w26, cmd_strlen(w26));
+        char *w27 = "poke(l+1040,\"seth \");poke(l+1044,\"appointed \");poke(l+1048,\"enos \");poke(l+1052,\"began \");poke(l+1056,\"call \");poke(l+1060,\"name \");poke(l+1064,\"generations \");poke(l+1068,\"adam \");poke(l+1072,\"likeness \");poke(l+1076,\"blessed \");";
+        fat32_write(fh, w27, cmd_strlen(w27));
+        char *w28 = "poke(l+1080,\"begat \");poke(l+1084,\"sons \");poke(l+1088,\"daughters \");poke(l+1092,\"lived \");poke(l+1096,\"died \");poke(l+1100,\"cainan \");poke(l+1104,\"mahalaleel \");poke(l+1108,\"jared \");poke(l+1112,\"walked \");poke(l+1116,\"three \");";
+        fat32_write(fh, w28, cmd_strlen(w28));
+        char *w29 = "poke(l+1120,\"hundred \");poke(l+1124,\"sixty \");poke(l+1128,\"five \");poke(l+1132,\"methuselah \");poke(l+1136,\"lamech \");poke(l+1140,\"noah \");poke(l+1144,\"comfort \");poke(l+1148,\"work \");poke(l+1152,\"toil \");poke(l+1156,\"hands \");";
+        fat32_write(fh, w29, cmd_strlen(w29));
+        char *w30 = "poke(l+1160,\"shem \");poke(l+1164,\"ham \");poke(l+1168,\"japheth \");poke(l+1172,\"men \");poke(l+1176,\"daughters \");poke(l+1180,\"born \");poke(l+1184,\"fair \");poke(l+1188,\"chose \");poke(l+1192,\"spirit \");poke(l+1196,\"strive \");";
+        fat32_write(fh, w30, cmd_strlen(w30));
+        char *e = "int c;int r;r=abs(rand());r=r-(r/5)*5;c=14+r;int i;i=0;while(i<c){int x;x=abs(rand());x=x-(x/300)*300;int w;w=peek(l+x*4);print_str(w);i=i+1;}nl();}";
+        fat32_write(fh, e, cmd_strlen(e));
         fat32_close(fh);
     }
 }
-
 
 void cmd_init(void) {
     fat32_init(); // Init FAT32 filesystem

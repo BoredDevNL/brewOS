@@ -2,7 +2,6 @@
 #include "graphics.h"
 #include "fat32.h"
 #include "wm.h"
-#include "memory_manager.h"
 #include "editor.h"
 #include "markdown.h"
 #include <stdbool.h>
@@ -279,9 +278,7 @@ static void explorer_set_folder_color(const char *folder_path, uint32_t color) {
 static void explorer_load_directory(const char *path) {
     explorer_strcpy(current_path, path);
     
-    FAT32_FileInfo *entries = (FAT32_FileInfo*)kmalloc(EXPLORER_MAX_FILES * sizeof(FAT32_FileInfo));
-    if (!entries) return;
-
+    FAT32_FileInfo entries[EXPLORER_MAX_FILES];
     int count = fat32_list_directory(path, entries, EXPLORER_MAX_FILES);
     
     item_count = 0;
@@ -309,7 +306,6 @@ static void explorer_load_directory(const char *path) {
         item_count++;
     }
     
-    kfree(entries);
     selected_item = -1;
 }
 

@@ -83,8 +83,6 @@ typedef struct {
     uint32_t size;                  // File size
     uint32_t mode;                  // 0=read, 1=write, 2=append
     bool valid;                     // Is this handle valid?
-    uint32_t dir_sector;            // Sector containing the directory entry
-    uint32_t dir_offset;            // Offset within that sector
 } FAT32_FileHandle;
 
 // Directory Entry Info (for listing)

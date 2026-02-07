@@ -13,7 +13,6 @@ ISO_DIR = iso_root
 
 KERNEL_ELF = $(BUILD_DIR)/brewos.elf
 ISO_IMAGE = brewos.iso
-DISK_IMG = disk.img
 
 C_SOURCES = $(wildcard $(SRC_DIR)/*.c)
 CLI_APP_SOURCES = $(wildcard $(SRC_DIR)/cli_apps/*.c)
@@ -38,7 +37,7 @@ LIMINE_URL_BASE = https://github.com/limine-bootloader/limine/raw/v$(LIMINE_VERS
 
 .PHONY: all clean run limine-setup
 
-all: $(ISO_IMAGE) $(DISK_IMG)
+all: $(ISO_IMAGE)
 
 # Ensure build directories exist
 $(BUILD_DIR):
@@ -113,19 +112,10 @@ $(ISO_IMAGE): $(KERNEL_ELF) limine.cfg limine-setup
 	# Install Limine to ISO (for BIOS boot)
 	./limine/limine bios-install $(ISO_IMAGE)
 
-# Create 512MB FAT32 Disk Image
-$(DISK_IMG):
-	@if [ ! -f $(DISK_IMG) ]; then \
-		echo "Creating 512MB FAT32 disk image..."; \
-		hdiutil create -size 512m -fs "MS-DOS FAT32" -layout NONE -type UDTO -o disk_temp; \
-		mv disk_temp.cdr $(DISK_IMG); \
-	fi
-
 clean:
-	rm -rf $(BUILD_DIR) $(ISO_DIR) $(ISO_IMAGE) $(DISK_IMG)
+	rm -rf $(BUILD_DIR) $(ISO_DIR) $(ISO_IMAGE)
 
-run: $(ISO_IMAGE) $(DISK_IMG)
+run: $(ISO_IMAGE)
 	qemu-system-x86_64 -m 2G -serial stdio -cdrom $(ISO_IMAGE) -boot d \
 		-audiodev coreaudio,id=audio0 -machine pcspk-audiodev=audio0 \
-		-netdev user,id=net0,hostfwd=udp::12345-:12345 -device e1000,netdev=net0 \
-		-drive file=$(DISK_IMG),format=raw,media=disk,index=1
+		-netdev user,id=net0,hostfwd=udp::12345-:12345 -device e1000,netdev=net0
