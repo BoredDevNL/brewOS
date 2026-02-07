@@ -210,6 +210,9 @@ void cli_cmd_echo(char *args) {
 }
 
 void cli_cmd_cat(char *args) {
+    // Skip leading whitespace
+    while (args && *args == ' ') args++;
+
     if (!args || args[0] == 0) {
         cli_write("Usage: cat <filename>\n");
         return;
@@ -253,7 +256,7 @@ void cli_cmd_touch(char *args) {
     
     char filename[256];
     int i = 0;
-    while (args[i] && args[i] != ' ' && args[i] != '\t') {
+    while (args[i] && args[i] != ' ' && args[i] != '\t' && args[i] != '\n') {
         filename[i] = args[i];
         i++;
     }
