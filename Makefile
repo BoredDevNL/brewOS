@@ -118,4 +118,5 @@ clean:
 run: $(ISO_IMAGE)
 	qemu-system-x86_64 -m 2G -serial stdio -cdrom $(ISO_IMAGE) -boot d \
 		-audiodev coreaudio,id=audio0 -machine pcspk-audiodev=audio0 \
-		-netdev user,id=net0,hostfwd=udp::12345-:12345 -device e1000,netdev=net0
+		-netdev user,id=net0,hostfwd=udp::12345-:12345 -device e1000,netdev=net0 \
+		-vga std -global VGA.xres=1920 -global VGA.yres=1080

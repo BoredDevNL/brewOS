@@ -592,6 +592,7 @@ static int explorer_build_context_menu(ExplorerContextItem *items_out) {
         
         if (!is_dir) {
              items_out[count++] = (ExplorerContextItem){"Open", 100, true, COLOR_BLACK};
+             items_out[count++] = (ExplorerContextItem){"Open w/ textedit", 110, true, COLOR_BLACK};
              if (explorer_is_markdown_file(items[file_context_menu_item].name)) {
                  items_out[count++] = (ExplorerContextItem){"Open w/ Markdown", 109, true, COLOR_BLACK};
              }
@@ -944,21 +945,6 @@ static void explorer_paint(Window *win) {
     draw_button(win->x + win->w - 160, offset_y + 4, 30, 30, "^", false);
     draw_button(win->x + win->w - 125, offset_y + 4, 30, 30, "v", false);
     
-    // Draw dropdown menu if visible
-    if (dropdown_menu_visible) {
-        int menu_x = dropdown_btn_x;
-        int menu_y = offset_y + 34;
-        
-        // Draw menu background
-        draw_rect(menu_x, menu_y, DROPDOWN_MENU_WIDTH, dropdown_menu_item_height * DROPDOWN_MENU_ITEMS, COLOR_LTGRAY);
-        draw_bevel_rect(menu_x, menu_y, DROPDOWN_MENU_WIDTH, dropdown_menu_item_height * DROPDOWN_MENU_ITEMS, true);
-        
-        // Draw menu items
-        draw_string(menu_x + 8, menu_y + 5, "New File", COLOR_BLACK);
-        draw_string(menu_x + 8, menu_y + dropdown_menu_item_height + 5, "New Folder", COLOR_BLACK);
-        draw_string(menu_x + 8, menu_y + dropdown_menu_item_height * 2 + 5, "Delete", COLOR_RED);
-    }
-    
     // Draw file list
     int content_start_y = offset_y + 40;
     
@@ -994,6 +980,21 @@ static void explorer_paint(Window *win) {
     
     graphics_clear_clipping();
     
+    // Draw dropdown menu if visible
+    if (dropdown_menu_visible) {
+        int menu_x = dropdown_btn_x;
+        int menu_y = offset_y + 34;
+        
+        // Draw menu background
+        draw_rect(menu_x, menu_y, DROPDOWN_MENU_WIDTH, dropdown_menu_item_height * DROPDOWN_MENU_ITEMS, COLOR_LTGRAY);
+        draw_bevel_rect(menu_x, menu_y, DROPDOWN_MENU_WIDTH, dropdown_menu_item_height * DROPDOWN_MENU_ITEMS, true);
+        
+        // Draw menu items
+        draw_string(menu_x + 8, menu_y + 5, "New File", COLOR_BLACK);
+        draw_string(menu_x + 8, menu_y + dropdown_menu_item_height + 5, "New Folder", COLOR_BLACK);
+        draw_string(menu_x + 8, menu_y + dropdown_menu_item_height * 2 + 5, "Delete", COLOR_RED);
+    }
+
     // Draw dialogs
     if (dialog_state == DIALOG_CREATE_FILE) {
         int dlg_x = win->x + win->w / 2 - 150;
@@ -1615,6 +1616,20 @@ static void explorer_handle_file_context_menu_click(Window *win, int x, int y) {
         explorer_clipboard_copy(full_path);
     } else if (clicked_action == 106) { // Delete
         dialog_open_delete_confirm(file_context_menu_item);
+    } else if (clicked_action == 110) { // Open with Text Editor
+        win_editor.visible = true; win_editor.focused = true;
+        int max_z = 0;
+        if (win_explorer.z_index > max_z) max_z = win_explorer.z_index;
+        if (win_cmd.z_index > max_z) max_z = win_cmd.z_index;
+        if (win_notepad.z_index > max_z) max_z = win_notepad.z_index;
+        if (win_calculator.z_index > max_z) max_z = win_calculator.z_index;
+        if (win_editor.z_index > max_z) max_z = win_editor.z_index;
+        if (win_markdown.z_index > max_z) max_z = win_markdown.z_index;
+        if (win_control_panel.z_index > max_z) max_z = win_control_panel.z_index;
+        if (win_about.z_index > max_z) max_z = win_about.z_index;
+        if (win_minesweeper.z_index > max_z) max_z = win_minesweeper.z_index;
+        win_editor.z_index = max_z + 1;
+        editor_open_file(full_path);
     } else if (clicked_action == ACTION_RESTORE) {
         explorer_restore_file(file_context_menu_item);
     } else if (clicked_action == ACTION_CREATE_SHORTCUT) {

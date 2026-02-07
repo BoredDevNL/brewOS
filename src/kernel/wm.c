@@ -81,8 +81,8 @@ static int desktop_icon_count = 0;
 // Desktop Settings
 bool desktop_snap_to_grid = true;
 bool desktop_auto_align = true;
-int desktop_max_rows_per_col = 9;
-int desktop_max_cols = 15;
+int desktop_max_rows_per_col = 13;
+int desktop_max_cols = 23;
 
 // Helper to check if string ends with suffix
 static bool str_ends_with(const char *str, const char *suffix) {
@@ -203,8 +203,7 @@ static void refresh_desktop_icons(void) {
             if (grid_y >= desktop_max_rows_per_col) {
                 grid_y = 0;
                 grid_x++;
-                // Skip if we reached the recycle bin column/row? 
-                // No, just fill. If we reach max files, we stop adding.
+
             }
         }
     } else {
