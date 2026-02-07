@@ -954,7 +954,8 @@ static void create_test_files(void) {
     fh = fat32_open("README.md", "w");
     if (fh) {
         const char *content = 
-            "# Brew OS 1.01 Alpha\n\n"
+            "# Brew OS 1.40 Beta\n\n"
+            "BrewOS is now in a Beta stage as i have brought over all apps from brewkernel and have made the DE a lot more usable and stable.\n"
             "## Brewkernel is now BrewOS!\n"
             "Brewkernel will from now on be deprecated as it's core became too messy. I have built a less bloated kernel and wrote a DE above it, which is why it is now an OS instead of a kernel (in my opinion).\n\n"
             "Brew Kernel is a simple x86_64 hobbyist operating system.\n"

@@ -20,7 +20,7 @@ Window win_explorer;
 #define EXPLORER_MAX_FILES 64
 #define EXPLORER_ITEM_HEIGHT 80
 #define EXPLORER_ITEM_WIDTH 120
-#define EXPLORER_COLS 3
+#define EXPLORER_COLS 4
 #define EXPLORER_ROWS 4
 #define EXPLORER_PADDING 15
 
