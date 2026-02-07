@@ -222,8 +222,6 @@ int ipv4_send_packet(const ipv4_address_t* dest_ip,uint8_t protocol,const void* 
     } else { 
         int ok=arp_lookup(&target_ip,&dest_mac); 
         if(ok!=0){ 
-            // ARP failed, maybe broadcast? Or fail? 
-            // For now, keep existing behavior of broadcasting if ARP fails
             for(int i=0;i<6;i++) dest_mac.bytes[i]=0xFF; 
         } 
     }

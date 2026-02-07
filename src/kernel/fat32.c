@@ -29,6 +29,7 @@ static FileEntry files[MAX_FILES];
 static uint32_t next_cluster = 3;  // Start after reserved clusters 0, 1, 2
 static FAT32_FileHandle open_handles[MAX_OPEN_HANDLES];
 static char current_dir[FAT32_MAX_PATH] = "/";
+static int desktop_file_limit = -1;
 
 // === Helper Functions ===
 
@@ -208,6 +209,34 @@ static uint32_t allocate_cluster(void) {
     return cluster;
 }
 
+// Check desktop limit
+static bool check_desktop_limit(const char *normalized_path) {
+    if (desktop_file_limit < 0) return true;
+    
+    // Check if path is directly in /Desktop (not subfolder)
+    // Path should start with /Desktop/ and have no other slashes
+    if (fs_strlen(normalized_path) > 9 && 
+        normalized_path[0] == '/' && 
+        normalized_path[1] == 'D' && normalized_path[2] == 'e' && 
+        normalized_path[3] == 's' && normalized_path[4] == 'k' && 
+        normalized_path[5] == 't' && normalized_path[6] == 'o' && 
+        normalized_path[7] == 'p' && normalized_path[8] == '/') {
+            
+        // Check for subfolders
+        const char *p = normalized_path + 9;
+        while (*p) {
+            if (*p == '/') return true; // Subfolder, allow
+            p++;
+        }
+        
+        // Count files in /Desktop
+        FAT32_FileInfo info[256]; // Temp buffer
+        int count = fat32_list_directory("/Desktop", info, 256);
+        if (count >= desktop_file_limit) return false;
+    }
+    return true;
+}
+
 // === Public API ===
 
 void fat32_init(void) {
@@ -235,6 +264,10 @@ void fat32_init(void) {
     current_dir[1] = 0;
 }
 
+void fat32_set_desktop_limit(int limit) {
+    desktop_file_limit = limit;
+}
+
 FAT32_FileHandle* fat32_open(const char *path, const char *mode) {
     char normalized[FAT32_MAX_PATH];
     fat32_normalize_path(path, normalized);
@@ -249,6 +282,10 @@ FAT32_FileHandle* fat32_open(const char *path, const char *mode) {
     } else if (mode[0] == 'w' || (mode[0] == 'a')) {
         // Write/append mode - create if not exists
         if (!entry) {
+            if (!check_desktop_limit(normalized)) {
+                return NULL;
+            }
+            
             entry = find_free_entry();
             if (!entry) return NULL;
             
@@ -355,7 +392,7 @@ int fat32_write(FAT32_FileHandle *handle, const void *buffer, int size) {
     int bytes_written = 0;
     const uint8_t *buf = (const uint8_t *)buffer;
     
-    // Check if we are at a cluster boundary from a previous write
+    // Check for cluster boundary from a previous write
     if (handle->position > 0 && (handle->position % FAT32_CLUSTER_SIZE) == 0) {
          uint32_t next = fat_table[handle->cluster];
          if (next >= 0xFFFFFFF8) {
@@ -439,6 +476,10 @@ bool fat32_mkdir(const char *path) {
     
     if (find_file(normalized)) {
         return false;  // Already exists
+    }
+    
+    if (!check_desktop_limit(normalized)) {
+        return false;
     }
     
     FileEntry *entry = find_free_entry();

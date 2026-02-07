@@ -1,4 +1,5 @@
-# Brew OS 1.20 Alpha
+# Brew OS 1.40 Beta
+BrewOS is now in a Beta stage as i have brought over all apps from brewkernel and have made the DE a lot more usable and stable.
 
 ## Brewkernel is now BrewOS!
 Brewkernel will from now on be deprecated as it's core became too messy. I have built a less bloated kernel and wrote a DE above it, which is why it is now an OS instead of a kernel (in my opinion).
@@ -9,12 +10,16 @@ Brew Kernel is a simple x86_64 hobbyist operating system.
 It features a DE (and WM), a FAT32 filesystem, customizable UI and much much more!
 
 ## Features
+- Drag and drop mouse centered UI
+- Customizable UI
 - Basic Networking Stack
 - Brew WM
 - Fat 32 FS
 - 64-bit long mode support
 - Multiboot2 compliant
 - Text editor
+- Markdown Viewer
+- Minesweeper
 - IDT
 - Ability to run on actual x86_64 hardware
 - CLI

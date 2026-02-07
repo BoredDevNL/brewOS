@@ -14,11 +14,15 @@ static bool g_use_pattern = false;
 static DirtyRect g_dirty = {0, 0, 0, 0, false};
 
 // Double buffering - allocate a back buffer
-// Max screen size: 2048x2048 @ 32bpp = 16MB, but we'll allocate for common sizes
+// Max screen size: 2048x2048 @ 32bpp = 16MB, but allocate for common sizes
 // Using a simple approach: allocate max size buffer
 #define MAX_FB_WIDTH 2048
 #define MAX_FB_HEIGHT 2048
 static uint32_t g_back_buffer[MAX_FB_WIDTH * MAX_FB_HEIGHT] __attribute__((aligned(4096)));
+
+// Clipping state
+static int g_clip_x = 0, g_clip_y = 0, g_clip_w = 0, g_clip_h = 0;
+static bool g_clip_enabled = false;
 
 void graphics_init(struct limine_framebuffer *fb) {
     g_fb = fb;
@@ -105,6 +109,13 @@ void graphics_clear_dirty(void) {
 void put_pixel(int x, int y, uint32_t color) {
     if (!g_fb) return;
     if (x < 0 || x >= (int)g_fb->width || y < 0 || y >= (int)g_fb->height) return;
+    
+    if (g_clip_enabled) {
+        if (x < g_clip_x || x >= g_clip_x + g_clip_w ||
+            y < g_clip_y || y >= g_clip_y + g_clip_h) {
+            return;
+        }
+    }
     
     // Draw to back buffer
     uint32_t pixel_offset = y * g_fb->width + x;
@@ -207,4 +218,16 @@ void graphics_flip_buffer(void) {
         src += g_fb->width;
         dst += g_fb->pitch;
     }
+}
+
+void graphics_set_clipping(int x, int y, int w, int h) {
+    g_clip_x = x;
+    g_clip_y = y;
+    g_clip_w = w;
+    g_clip_h = h;
+    g_clip_enabled = true;
+}
+
+void graphics_clear_clipping(void) {
+    g_clip_enabled = false;
 }

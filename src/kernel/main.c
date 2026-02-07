@@ -49,9 +49,6 @@ static void hcf(void) {
 void kmain(void) {
     platform_init();
     // 1. Graphics Init
-    if (LIMINE_BASE_REVISION_SUPPORTED == false) {
-        // Warning
-    }
 
     if (framebuffer_request.response == NULL || framebuffer_request.response->framebuffer_count < 1) {
         hcf();

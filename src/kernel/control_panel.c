@@ -17,6 +17,7 @@ Window win_control_panel;
 #define VIEW_MAIN 0
 #define VIEW_WALLPAPER 1
 #define VIEW_NETWORK 2
+#define VIEW_DESKTOP 3
 
 static int current_view = VIEW_MAIN;
 static char rgb_r[4] = "";
@@ -197,6 +198,16 @@ static void control_panel_paint_main(Window *win) {
     draw_rect(offset_x + 23, net_offset_y + 5, 1, 11, 0xFFFFFFFF);
     
     draw_string(offset_x + 40, net_offset_y + 8, "Network", 0xFF000000);
+    
+    // Draw Desktop Settings Icon
+    int desk_offset_y = net_offset_y + 35;
+    // Folder icon style
+    draw_rect(offset_x + 5, desk_offset_y + 2, 12, 4, COLOR_LTGRAY);
+    draw_rect(offset_x + 5, desk_offset_y + 2, 12, 1, COLOR_BLACK);
+    draw_rect(offset_x + 5, desk_offset_y + 6, 24, 14, 0xFFE0C060); // Tan folder
+    draw_rect(offset_x + 5, desk_offset_y + 6, 24, 1, COLOR_BLACK);
+    draw_rect(offset_x + 5, desk_offset_y + 6, 1, 14, COLOR_BLACK);
+    draw_string(offset_x + 40, desk_offset_y + 8, "Desktop", 0xFF000000);
 }
 
 static void control_panel_paint_wallpaper(Window *win) {
@@ -409,6 +420,54 @@ static void control_panel_paint_network(Window *win) {
     draw_button(offset_x, section_y, 80, 22, "Send", false);
 }
 
+static void control_panel_paint_desktop(Window *win) {
+    int offset_x = win->x + 8;
+    int offset_y = win->y + 30;
+    
+    // Back button
+    draw_string(offset_x, offset_y, "< Back", 0xFF000080);
+    draw_string(offset_x, offset_y + 25, "Desktop Settings:", 0xFF000000);
+    
+    int section_y = offset_y + 50;
+    
+    // Snap to Grid
+    draw_rect(offset_x, section_y, 15, 15, 0xFFFFFFFF);
+    draw_rect(offset_x, section_y, 15, 1, COLOR_BLACK);
+    draw_rect(offset_x, section_y, 1, 15, COLOR_BLACK);
+    draw_rect(offset_x + 14, section_y, 1, 15, COLOR_BLACK);
+    draw_rect(offset_x, section_y + 14, 15, 1, COLOR_BLACK);
+    if (desktop_snap_to_grid) draw_string(offset_x + 3, section_y + 3, "X", COLOR_BLACK);
+    draw_string(offset_x + 25, section_y + 3, "Snap to Grid", COLOR_BLACK);
+    
+    // Auto Align
+    section_y += 25;
+    draw_rect(offset_x, section_y, 15, 15, 0xFFFFFFFF);
+    draw_rect(offset_x, section_y, 15, 1, COLOR_BLACK);
+    draw_rect(offset_x, section_y, 1, 15, COLOR_BLACK);
+    draw_rect(offset_x + 14, section_y, 1, 15, COLOR_BLACK);
+    draw_rect(offset_x, section_y + 14, 15, 1, COLOR_BLACK);
+    if (desktop_auto_align) draw_string(offset_x + 3, section_y + 3, "X", COLOR_BLACK);
+    draw_string(offset_x + 25, section_y + 3, "Auto Align Icons", COLOR_BLACK);
+    
+    // Max Rows
+    section_y += 25;
+    draw_string(offset_x, section_y + 3, "Apps per column:", COLOR_BLACK);
+    draw_button(offset_x + 130, section_y, 20, 20, "-", false);
+    char num[4]; num[0] = '0' + (desktop_max_rows_per_col / 10); num[1] = '0' + (desktop_max_rows_per_col % 10); num[2] = 0;
+    if (num[0] == '0') { num[0] = num[1]; num[1] = 0; }
+    draw_string(offset_x + 160, section_y + 5, num, COLOR_BLACK);
+    draw_button(offset_x + 180, section_y, 20, 20, "+", false);
+    
+    // Max Cols
+    section_y += 25;
+    draw_string(offset_x, section_y + 3, "Columns:", COLOR_BLACK);
+    draw_button(offset_x + 130, section_y, 20, 20, "-", false);
+    char num_c[4]; num_c[0] = '0' + (desktop_max_cols / 10); num_c[1] = '0' + (desktop_max_cols % 10); num_c[2] = 0;
+    if (num_c[0] == '0') { num_c[0] = num_c[1]; num_c[1] = 0; }
+    draw_string(offset_x + 160, section_y + 5, num_c, COLOR_BLACK);
+    draw_button(offset_x + 180, section_y, 20, 20, "+", false);
+}
+
 static void control_panel_paint(Window *win) {
     if (current_view == VIEW_MAIN) {
         control_panel_paint_main(win);
@@ -416,6 +475,8 @@ static void control_panel_paint(Window *win) {
         control_panel_paint_wallpaper(win);
     } else if (current_view == VIEW_NETWORK) {
         control_panel_paint_network(win);
+    } else if (current_view == VIEW_DESKTOP) {
+        control_panel_paint_desktop(win);
     }
 }
 
@@ -439,6 +500,13 @@ static void control_panel_handle_click(Window *win, int x, int y) {
             y >= net_offset_y && y < net_offset_y + 25) {
             current_view = VIEW_NETWORK;
             focused_field = -1;
+        }
+        
+        // Check desktop button
+        int desk_offset_y = net_offset_y + 35;
+        if (x >= offset_x + 5 && x < offset_x + 120 &&
+            y >= desk_offset_y && y < desk_offset_y + 25) {
+            current_view = VIEW_DESKTOP;
         }
     } else if (current_view == VIEW_WALLPAPER) {
         int offset_x = 8;
@@ -726,6 +794,73 @@ static void control_panel_handle_click(Window *win, int x, int y) {
                 }
             }
             return;
+        }
+    } else if (current_view == VIEW_DESKTOP) {
+        int offset_x = 8;
+        int offset_y = 30;
+        
+        // Back button
+        if (x >= offset_x && x < offset_x + 40 && y >= offset_y && y < offset_y + 15) {
+            current_view = VIEW_MAIN;
+            return;
+        }
+        
+        int section_y = offset_y + 50;
+        // Snap toggle
+        if (x >= offset_x && x < offset_x + 150 && y >= section_y && y < section_y + 20) {
+            desktop_snap_to_grid = !desktop_snap_to_grid;
+            // If Snap is turned OFF, Auto Align must be OFF
+            if (!desktop_snap_to_grid) {
+                desktop_auto_align = false;
+            }
+            wm_refresh_desktop();
+            return;
+        }
+        
+        // Auto Align toggle
+        section_y += 25;
+        if (x >= offset_x && x < offset_x + 150 && y >= section_y && y < section_y + 20) {
+            desktop_auto_align = !desktop_auto_align;
+            // If Auto Align is turned ON, Snap must be ON
+            if (desktop_auto_align) {
+                desktop_snap_to_grid = true;
+            }
+            wm_refresh_desktop();
+            return;
+        }
+        
+        // Rows adjust
+        section_y += 25;
+        if (x >= offset_x + 130 && x < offset_x + 150 && y >= section_y && y < section_y + 20) {
+            if (desktop_max_rows_per_col > 1) {
+                if (desktop_max_cols * (desktop_max_rows_per_col - 1) < wm_get_desktop_icon_count()) {
+                    wm_show_message("Error", "Cannot reduce rows: too many files!");
+                } else {
+                    desktop_max_rows_per_col--;
+                    wm_refresh_desktop();
+                }
+            }
+        }
+        if (x >= offset_x + 180 && x < offset_x + 200 && y >= section_y && y < section_y + 20) {
+            if (desktop_max_rows_per_col < 15) desktop_max_rows_per_col++;
+            wm_refresh_desktop();
+        }
+        
+        // Cols adjust
+        section_y += 25;
+        if (x >= offset_x + 130 && x < offset_x + 150 && y >= section_y && y < section_y + 20) {
+            if (desktop_max_cols > 1) {
+                if ((desktop_max_cols - 1) * desktop_max_rows_per_col < wm_get_desktop_icon_count()) {
+                    wm_show_message("Error", "Cannot reduce cols: too many files!");
+                } else {
+                    desktop_max_cols--;
+                    wm_refresh_desktop();
+                }
+            }
+        }
+        if (x >= offset_x + 180 && x < offset_x + 200 && y >= section_y && y < section_y + 20) {
+            if (desktop_max_cols < 20) desktop_max_cols++;
+            wm_refresh_desktop();
         }
     }
 }

@@ -66,7 +66,6 @@ static int md_strncpy(char *dest, const char *src, int n) {
 static int md_strcmp(const char *s1, const char *s2) {
     (void)s1;  // Suppress unused warning
     (void)s2;  // Suppress unused warning
-    // Reserved for future use
     return 0;
 }
 
@@ -74,7 +73,6 @@ static int md_strcmp(const char *s1, const char *s2) {
 static bool md_starts_with(const char *str, const char *pattern) {
     (void)str;  // Suppress unused warning
     (void)pattern;  // Suppress unused warning
-    // Reserved for future use
     return false;
 }
 

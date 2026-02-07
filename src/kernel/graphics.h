@@ -34,4 +34,8 @@ void graphics_clear_dirty(void);
 void graphics_flip_buffer(void);
 void graphics_clear_back_buffer(uint32_t color);
 
+// Clipping
+void graphics_set_clipping(int x, int y, int w, int h);
+void graphics_clear_clipping(void);
+
 #endif

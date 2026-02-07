@@ -51,7 +51,10 @@ void wm_process_input(void);
 void wm_mark_dirty(int x, int y, int w, int h);
 void wm_refresh(void);
 void wm_paint(void);
+void wm_refresh_desktop(void);
 void wm_timer_tick(void);
+int wm_get_desktop_icon_count(void);
+void wm_show_message(const char *title, const char *message);
 
 // Hook for external rendering (e.g. VM overlay)
 extern void (*wm_custom_paint_hook)(void);
@@ -59,5 +62,21 @@ extern void (*wm_custom_paint_hook)(void);
 // Drawing helpers
 void draw_bevel_rect(int x, int y, int w, int h, bool sunken);
 void draw_button(int x, int y, int w, int h, const char *text, bool pressed);
+void draw_icon(int x, int y, const char *label);
+void draw_folder_icon(int x, int y, const char *label);
+void draw_document_icon(int x, int y, const char *label);
+void draw_notepad_icon(int x, int y, const char *label);
+void draw_calculator_icon(int x, int y, const char *label);
+void draw_terminal_icon(int x, int y, const char *label);
+void draw_minesweeper_icon(int x, int y, const char *label);
+void draw_control_panel_icon(int x, int y, const char *label);
+void draw_about_icon(int x, int y, const char *label);
+void draw_recycle_bin_icon(int x, int y, const char *label);
+
+// Desktop Settings
+extern bool desktop_snap_to_grid;
+extern bool desktop_auto_align;
+extern int desktop_max_rows_per_col;
+extern int desktop_max_cols;
 
 #endif

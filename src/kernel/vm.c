@@ -162,7 +162,7 @@ static void vm_syscall(int id) {
             break;
         }
         case SYS_STRCAT: {
-             // Not implemented in cli_utils, skip
+             // Not implemented in cli_utils
              pop(); pop(); push(0);
              break;
         }
@@ -188,8 +188,7 @@ static void vm_syscall(int id) {
         }
         // Simplified Heap (using top of memory growing down?)
         // For now, static allocation or mapped.
-        // Let's implement a dummy malloc that returns an index into memory
-        // Starting at 1024 (reserve first 1K for globals)
+        // Dummy malloc that returns an index into memory starting at 1024
         case SYS_MALLOC: {
             int size = pop();
             int res = vm_heap_ptr;
@@ -317,8 +316,8 @@ static void vm_syscall(int id) {
             push(0);
             break;
         }
-        case SYS_EXEC: pop(); push(-1); break; // Not impl
-        case SYS_SYSTEM: pop(); push(-1); break; // Not impl
+        case SYS_EXEC: pop(); push(-1); break;
+        case SYS_SYSTEM: pop(); push(-1); break;
         
         // --- New Builtins ---
         case SYS_ISALNUM: {
@@ -601,7 +600,6 @@ int vm_exec(const uint8_t *code, int code_size) {
                 break;
             }
             case OP_POP:
-                // cmd_write("DEBUG: POP\n"); 
                 pop(); 
                 break;
             default: 

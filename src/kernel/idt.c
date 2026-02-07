@@ -47,10 +47,6 @@ static void pic_remap(void) {
     outb(0x21, 0x01); io_wait();
     outb(0xA1, 0x01); io_wait();
 
-    // Restore masks (but verify we don't mask IRQ 1 and 12)
-    // Actually, simple OSs often just mask everything except what they want.
-    // Let's unmask IRQ 1 (Keyboard) and IRQ 12 (Mouse) explicitly and mask others.
-    // 0xFD = 1111 1101 (IRQ 1 unmasked)
     // 0xEF = 1110 1111 (IRQ 12 (4 on slave) unmasked)
     
     outb(0x21, 0xF9); // Unmask Keyboard (IRQ1) and Cascade (IRQ2)

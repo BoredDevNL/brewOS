@@ -289,7 +289,7 @@ MemStats memory_get_stats(void) {
 void memory_print_stats(void) {
     MemStats stats = memory_get_stats();
     
-    // We need to use the CLI write functions - declare them as extern
+    // Use CLI write functions - declare as extern
     extern void cmd_write(const char *str);
     extern void cmd_write_int(int n);
     extern void cmd_putchar(char c);
