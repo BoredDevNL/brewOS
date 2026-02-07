@@ -83,9 +83,11 @@ qemu-system-x86_64 -m 2G -serial stdio -cdrom brewos.iso -boot d
 
 3. **Boot**: Insert the USB drive and select it in the boot menu during startup
 
+**Networking requires an Intel E1000 network card or similar while using Ethernet.**
 4. **Tested Hardware**:
-   - HP EliteDesk 705 G4 DM (AMD Ryzen 5 PRO 2400G, Radeon Vega)
-   - Lenovo ThinkPad A475 20KL002VMH (AMD Pro A12-8830B, Radeon R7)
+   - HP EliteDesk 705 G4 DM (AMD Ryzen 5 PRO 2400G, Radeon Vega) **Tested, no networking.**
+   - Lenovo ThinkPad A475 20KL002VMH (AMD Pro A12-8830B, Radeon R7) **Tested, no networking.**
+   - Acer Aspire E5-573-311M (Intel Core i3-5005U, Intel HD Graphics) **Tested, no networking.**
 
 
 ## Project Structure
