@@ -11,6 +11,7 @@
 #include "minesweeper.h"
 #include "control_panel.h"
 #include "about.h"
+#include "paint.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -33,6 +34,7 @@ Window win_explorer;
 #define DIALOG_REPLACE_MOVE_CONFIRM 5
 #define DIALOG_CREATE_REPLACE_CONFIRM 6
 #define DIALOG_INPUT_MAX 256
+#define DIALOG_RENAME 8
 #define ACTION_RESTORE 108
 #define DIALOG_ERROR 7
 #define ACTION_CREATE_SHORTCUT 107
@@ -606,6 +608,7 @@ static int explorer_build_context_menu(ExplorerContextItem *items_out) {
         }
         
         items_out[count++] = (ExplorerContextItem){"Delete", 106, true, COLOR_RED};
+        items_out[count++] = (ExplorerContextItem){"Rename", 111, true, COLOR_BLACK};
         items_out[count++] = (ExplorerContextItem){"Create Shortcut", ACTION_CREATE_SHORTCUT, true, COLOR_BLACK};
         
         if (is_dir) {
@@ -794,6 +797,8 @@ static void explorer_open_target(const char *path) {
             win_markdown.visible = true; win_markdown.focused = true;
             win_markdown.z_index = max_z + 1;
             markdown_open_file(path);
+        } else if (explorer_str_ends_with(path, ".pnt")) {
+            paint_load(path);
         } else {
             win_editor.visible = true; win_editor.focused = true;
             win_editor.z_index = max_z + 1;
@@ -905,6 +910,8 @@ static void explorer_draw_file_icon(int x, int y, bool is_dir, uint32_t color, c
         else if (explorer_strcmp(filename, "Recycle Bin.shortcut") == 0) draw_recycle_bin_icon(x + 5, y + 5, "");
         else if (explorer_strcmp(filename, "RecycleBin") == 0) draw_recycle_bin_icon(x + 5, y + 5, "");
         else draw_icon(x + 5, y + 5, "");
+    } else if (explorer_str_ends_with(filename, ".pnt")) {
+        draw_paint_icon(x - 15, y + 10, "");
     } else {
         // Document icon - larger
         draw_rect(x + 12, y + 10, 20, 25, COLOR_WHITE);
@@ -912,10 +919,15 @@ static void explorer_draw_file_icon(int x, int y, bool is_dir, uint32_t color, c
         draw_rect(x + 12, y + 10, 2, 25, COLOR_BLACK);
         draw_rect(x + 30, y + 10, 2, 25, COLOR_BLACK);
         draw_rect(x + 12, y + 33, 20, 2, COLOR_BLACK);
-        // Lines on document
-        draw_rect(x + 15, y + 18, 14, 1, COLOR_DKGRAY);
-        draw_rect(x + 15, y + 23, 14, 1, COLOR_DKGRAY);
-        draw_rect(x + 15, y + 28, 14, 1, COLOR_DKGRAY);
+        
+        if (explorer_str_ends_with(filename, ".md")) {
+            draw_string(x + 14, y + 12, "MD", COLOR_BLACK);
+        } else {
+            // Lines on document
+            draw_rect(x + 15, y + 18, 14, 1, COLOR_DKGRAY);
+            draw_rect(x + 15, y + 23, 14, 1, COLOR_DKGRAY);
+            draw_rect(x + 15, y + 28, 14, 1, COLOR_DKGRAY);
+        }
     }
 }
 
@@ -931,7 +943,7 @@ static void explorer_paint(Window *win) {
     // Draw path bar
     int path_height = 30;
     draw_bevel_rect(offset_x + 4, offset_y + 4, win->w - 16, path_height, true);
-    draw_string(offset_x + 10, offset_y + 10, "Path: ", COLOR_BLACK);
+    draw_string(offset_x + 10, offset_y + 10, "Path", COLOR_BLACK);
     draw_string(offset_x + 50, offset_y + 10, current_path, COLOR_BLACK);
     
     // Draw dropdown menu button (right-aligned, before back button)
@@ -1010,7 +1022,7 @@ static void explorer_paint(Window *win) {
         // Input field
         draw_bevel_rect(dlg_x + 10, dlg_y + 35, 280, 20, false);
         draw_string(dlg_x + 15, dlg_y + 40, dialog_input, COLOR_BLACK);
-        draw_string(dlg_x + 15 + dialog_input_cursor * 8, dlg_y + 40, "|", COLOR_BLACK);
+        draw_rect(dlg_x + 15 + dialog_input_cursor * 8, dlg_y + 39, 2, 12, COLOR_BLACK);
         
         // Buttons
         draw_button(dlg_x + 50, dlg_y + 65, 80, 25, "Create", false);
@@ -1029,7 +1041,7 @@ static void explorer_paint(Window *win) {
         // Input field
         draw_bevel_rect(dlg_x + 10, dlg_y + 35, 280, 20, false);
         draw_string(dlg_x + 15, dlg_y + 40, dialog_input, COLOR_BLACK);
-        draw_string(dlg_x + 15 + dialog_input_cursor * 8, dlg_y + 40, "|", COLOR_BLACK);
+        draw_rect(dlg_x + 15 + dialog_input_cursor * 8, dlg_y + 39, 2, 12, COLOR_BLACK);
         
         // Buttons
         draw_button(dlg_x + 50, dlg_y + 65, 80, 25, "Create", false);
@@ -1123,6 +1135,21 @@ static void explorer_paint(Window *win) {
         
         // OK Button
         draw_button(dlg_x + 110, dlg_y + 70, 80, 25, "OK", false);
+    } else if (dialog_state == DIALOG_RENAME) {
+        int dlg_x = win->x + win->w / 2 - 150;
+        int dlg_y = win->y + win->h / 2 - 60;
+        
+        draw_rect(dlg_x - 5, dlg_y - 5, 310, 120, COLOR_LTGRAY);
+        draw_bevel_rect(dlg_x, dlg_y, 300, 110, true);
+        
+        draw_string(dlg_x + 10, dlg_y + 10, "Rename", COLOR_BLACK);
+        
+        draw_bevel_rect(dlg_x + 10, dlg_y + 35, 280, 20, false);
+        draw_string(dlg_x + 15, dlg_y + 40, dialog_input, COLOR_BLACK);
+        draw_rect(dlg_x + 15 + dialog_input_cursor * 8, dlg_y + 39, 2, 12, COLOR_BLACK);
+        
+        draw_button(dlg_x + 50, dlg_y + 65, 80, 25, "Rename", false);
+        draw_button(dlg_x + 170, dlg_y + 65, 80, 25, "Cancel", false);
     }
     
     // Draw context menu if visible
@@ -1262,6 +1289,25 @@ static void explorer_handle_click(Window *win, int x, int y) {
             dialog_close();
             return;
         }
+    } else if (dialog_state == DIALOG_RENAME) {
+        int dlg_x = win->w / 2 - 150;
+        int dlg_y = win->h / 2 - 60;
+        
+        if (x >= dlg_x + 50 && x < dlg_x + 130 && y >= dlg_y + 65 && y < dlg_y + 90) {
+            char new_path[256];
+            explorer_strcpy(new_path, current_path);
+            if (new_path[explorer_strlen(new_path)-1] != '/') explorer_strcat(new_path, "/");
+            explorer_strcat(new_path, dialog_input);
+            
+            if (fat32_rename(dialog_target_path, new_path)) explorer_refresh();
+            dialog_close();
+            return;
+        }
+        
+        if (x >= dlg_x + 170 && x < dlg_x + 250 && y >= dlg_y + 65 && y < dlg_y + 90) {
+            dialog_close();
+            return;
+        }
     }
     
     // Handle dropdown menu clicks
@@ -1377,17 +1423,27 @@ static void explorer_handle_key(Window *win, char c) {
     (void)win;
     
     // Handle dialog input
-    if (dialog_state == DIALOG_CREATE_FILE || dialog_state == DIALOG_CREATE_FOLDER) {
+    if (dialog_state == DIALOG_CREATE_FILE || dialog_state == DIALOG_CREATE_FOLDER || dialog_state == DIALOG_RENAME) {
         if (c == 27) {  // ESC - close dialog
             dialog_close();
             return;
         } else if (c == '\n') {  // ENTER - confirm
             if (dialog_state == DIALOG_CREATE_FILE) {
                 dialog_confirm_create_file();
-            } else {
+            } else if (dialog_state == DIALOG_CREATE_FOLDER) {
                 dialog_confirm_create_folder();
+            } else if (dialog_state == DIALOG_RENAME) {
+                char new_path[256];
+                explorer_strcpy(new_path, current_path);
+                if (new_path[explorer_strlen(new_path)-1] != '/') explorer_strcat(new_path, "/");
+                explorer_strcat(new_path, dialog_input);
+                if (fat32_rename(dialog_target_path, new_path)) explorer_refresh();
+                dialog_close();
             }
-            return;
+        } else if (c == 19) {  // LEFT arrow
+            if (dialog_input_cursor > 0) dialog_input_cursor--;
+        } else if (c == 20) {  // RIGHT arrow
+            if (dialog_input_cursor < (int)explorer_strlen(dialog_input)) dialog_input_cursor++;
         } else if (c == 8 || c == 127) {  // BACKSPACE
             if (dialog_input_cursor > 0) {
                 dialog_input_cursor--;
@@ -1396,7 +1452,6 @@ static void explorer_handle_key(Window *win, char c) {
                     dialog_input[i] = dialog_input[i + 1];
                 }
             }
-            return;
         } else if (c >= 32 && c < 127) {  // Printable character
             int len = explorer_strlen(dialog_input);
             if (len < DIALOG_INPUT_MAX - 1) {
@@ -1407,8 +1462,8 @@ static void explorer_handle_key(Window *win, char c) {
                 dialog_input[dialog_input_cursor] = c;
                 dialog_input_cursor++;
             }
-            return;
         }
+        wm_mark_dirty(win->x, win->y, win->w, win->h);
         return;
     }
     
@@ -1616,6 +1671,11 @@ static void explorer_handle_file_context_menu_click(Window *win, int x, int y) {
         explorer_clipboard_copy(full_path);
     } else if (clicked_action == 106) { // Delete
         dialog_open_delete_confirm(file_context_menu_item);
+    } else if (clicked_action == 111) { // Rename
+        dialog_state = DIALOG_RENAME;
+        explorer_strcpy(dialog_input, items[file_context_menu_item].name);
+        dialog_input_cursor = explorer_strlen(dialog_input);
+        explorer_strcpy(dialog_target_path, full_path);
     } else if (clicked_action == 110) { // Open with Text Editor
         win_editor.visible = true; win_editor.focused = true;
         int max_z = 0;

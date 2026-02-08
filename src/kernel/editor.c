@@ -253,7 +253,7 @@ static void editor_paint(Window *win) {
     
     // Draw filename and save button area at top of content
     draw_rect(offset_x, offset_y, content_width, 25, COLOR_GRAY);
-    draw_string(offset_x + 10, offset_y + 5, "File: ", COLOR_BLACK);
+    draw_string(offset_x + 10, offset_y + 5, "File", COLOR_BLACK);
     draw_string(offset_x + 55, offset_y + 5, open_filename, COLOR_BLACK);
     
     // Draw save button

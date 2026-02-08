@@ -53,4 +53,7 @@ void cli_cmd_pcilist(char *args);
 // Compiler
 void cli_cmd_cc(char *args);
 
+// Music
+void cli_cmd_minecraft(char *args);
+
 #endif

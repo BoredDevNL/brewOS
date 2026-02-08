@@ -114,6 +114,7 @@ bool fat32_mkdir(const char *path);
 bool fat32_rmdir(const char *path);
 bool fat32_delete(const char *path);
 bool fat32_exists(const char *path);
+bool fat32_rename(const char *old_path, const char *new_path);
 bool fat32_is_directory(const char *path);
 
 // Listing

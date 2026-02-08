@@ -465,6 +465,8 @@ static const CommandEntry commands[] = {
     {"compc", cli_cmd_cc},
     {"CC", cli_cmd_cc},
     {"cc", cli_cmd_cc},
+    {"sweden", cli_cmd_minecraft},
+    {"SWEDEN", cli_cmd_minecraft},
     {NULL, NULL}
 };
 
@@ -949,6 +951,7 @@ static void create_test_files(void) {
     fh = fat32_open("Desktop/Terminal.shortcut", "w"); if(fh) fat32_close(fh);
     fh = fat32_open("Desktop/About.shortcut", "w"); if(fh) fat32_close(fh);
     fh = fat32_open("Desktop/Recycle Bin.shortcut", "w"); if(fh) fat32_close(fh);
+    fh = fat32_open("Desktop/Paint.shortcut", "w"); if(fh) fat32_close(fh);
     
     // Always try to write README to ensure content exists
     fh = fat32_open("README.md", "w");
@@ -1057,6 +1060,9 @@ static void create_test_files(void) {
         fat32_write(fh, (void *)content, cmd_strlen(content));
         fat32_close(fh);
     }    
+    
+   
+
     write_license_file();
     
     fh = fat32_open("Documents/notes.txt", "w");
@@ -1127,7 +1133,19 @@ static void create_test_files(void) {
         }
         fat32_close(fh);
     }
+
+    fh = fat32_open("Apps/DOOM.c", "w");
+    if (fh) {
+        const char *content = 
+            "int main(){\n"
+            "      puts(\"To DOOM, or not to DOOM.\\n\");\n"
+            "      puts(\"-Me\\n\");\n"
+            "}\n";
+        fat32_write(fh, (void *)content, cmd_strlen(content));
+        fat32_close(fh);
+    }
 }
+
 
 
 void cmd_init(void) {

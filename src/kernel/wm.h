@@ -13,6 +13,7 @@
 #define COLOR_LTGRAY    0xFFDFDFDF
 #define COLOR_DKGRAY    0xFF808080
 #define COLOR_RED       0xFFFF0000
+#define COLOR_PURPLE    0xFF800080
 #define COLOR_COFFEE    0xFF6B4423
 #define COLOR_APPLE_RED    0xFFFF0000
 #define COLOR_APPLE_ORANGE 0xFFFF7F00
@@ -72,6 +73,7 @@ void draw_minesweeper_icon(int x, int y, const char *label);
 void draw_control_panel_icon(int x, int y, const char *label);
 void draw_about_icon(int x, int y, const char *label);
 void draw_recycle_bin_icon(int x, int y, const char *label);
+void draw_paint_icon(int x, int y, const char *label);
 
 // Desktop Settings
 extern bool desktop_snap_to_grid;

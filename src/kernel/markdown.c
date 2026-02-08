@@ -276,7 +276,7 @@ static void md_paint(Window *win) {
     
     // Draw filename bar below title
     draw_rect(offset_x, offset_y, content_width, 20, COLOR_GRAY);
-    draw_string(offset_x + 4, offset_y + 4, "File: ", COLOR_BLACK);
+    draw_string(offset_x + 4, offset_y + 4, "File", COLOR_BLACK);
     draw_string(offset_x + 50, offset_y + 4, open_filename, COLOR_BLACK);
     
     // Draw scroll buttons on top right

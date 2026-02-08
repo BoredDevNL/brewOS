@@ -64,6 +64,13 @@ static bool fs_ends_with(const char *str, const char *suffix) {
     return fs_strcmp(str + str_len - suffix_len, suffix) == 0;
 }
 
+static bool fs_starts_with(const char *str, const char *prefix) {
+    while (*prefix) {
+        if (*prefix++ != *str++) return false;
+    }
+    return true;
+}
+
 // Extract filename from path
 static void extract_filename(const char *path, char *filename) {
     int len = fs_strlen(path);
@@ -524,6 +531,48 @@ bool fat32_delete(const char *path) {
 
 bool fat32_exists(const char *path) {
     return find_file(path) != NULL;
+}
+
+bool fat32_rename(const char *old_path, const char *new_path) {
+    FileEntry *entry = find_file(old_path);
+    if (!entry) return false;
+    if (find_file(new_path)) return false; // Destination exists
+
+    int old_len = fs_strlen(old_path);
+
+    // Update the entry itself and all children
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (!files[i].used) continue;
+
+        // 1. Update full_path if it matches or is a child
+        if (fs_strcmp(files[i].full_path, old_path) == 0) {
+            // This is the target
+            fs_strcpy(files[i].full_path, new_path);
+            extract_filename(new_path, files[i].filename);
+            extract_parent_path(new_path, files[i].parent_path);
+        } else if (fs_strlen(files[i].full_path) > old_len && 
+                   fs_starts_with(files[i].full_path, old_path) &&
+                   files[i].full_path[old_len] == '/') {
+            // This is a child path
+            char suffix[FAT32_MAX_PATH];
+            fs_strcpy(suffix, files[i].full_path + old_len);
+            fs_strcpy(files[i].full_path, new_path);
+            fs_strcat(files[i].full_path, suffix);
+        }
+
+        // 2. Update parent_path if it matches or is a child of the renamed folder
+        if (fs_strcmp(files[i].parent_path, old_path) == 0) {
+            fs_strcpy(files[i].parent_path, new_path);
+        } else if (fs_strlen(files[i].parent_path) > old_len &&
+                   fs_starts_with(files[i].parent_path, old_path) &&
+                   files[i].parent_path[old_len] == '/') {
+            char suffix[FAT32_MAX_PATH];
+            fs_strcpy(suffix, files[i].parent_path + old_len);
+            fs_strcpy(files[i].parent_path, new_path);
+            fs_strcat(files[i].parent_path, suffix);
+        }
+    }
+    return true;
 }
 
 bool fat32_is_directory(const char *path) {

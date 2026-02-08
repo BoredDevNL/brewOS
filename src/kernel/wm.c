@@ -15,6 +15,7 @@
 #include "minesweeper.h"
 #include "fat32.h"
 #include "memory_manager.h"
+#include "paint.h"
 
 // --- State ---
 static int mx = 400, my = 300; // Mouse Pos
@@ -28,6 +29,12 @@ static bool desktop_menu_visible = false;
 static int desktop_menu_x = 0;
 static int desktop_menu_y = 0;
 static int desktop_menu_target_icon = -1; // -1 for background
+
+// Desktop Dialog State
+static int desktop_dialog_state = 0; // 0=None, 8=Rename
+static char desktop_dialog_input[64];
+static int desktop_dialog_cursor = 0;
+static int desktop_dialog_target = -1;
 
 // Message Box
 static bool msg_box_visible = false;
@@ -53,7 +60,7 @@ static int drag_icon_orig_x = 0;
 static int drag_icon_orig_y = 0;
 
 // Windows array for z-order management
-static Window *all_windows[9];
+static Window *all_windows[10];
 static int window_count = 0;
 
 // Redraw system
@@ -81,8 +88,8 @@ static int desktop_icon_count = 0;
 // Desktop Settings
 bool desktop_snap_to_grid = true;
 bool desktop_auto_align = true;
-int desktop_max_rows_per_col = 13;
-int desktop_max_cols = 23;
+int desktop_max_rows_per_col = 9;
+int desktop_max_cols = 15;
 
 // Helper to check if string ends with suffix
 static bool str_ends_with(const char *str, const char *suffix) {
@@ -561,6 +568,24 @@ void draw_recycle_bin_icon(int x, int y, const char *label) {
     draw_icon_label(x, y, label);
 }
 
+void draw_paint_icon(int x, int y, const char *label) {
+    // Paint Palette Icon
+    draw_rect(x + 27, y + 2, 26, 20, COLOR_WHITE);
+    draw_rect(x + 27, y + 2, 26, 1, COLOR_BLACK);
+    draw_rect(x + 27, y + 2, 1, 20, COLOR_BLACK);
+    draw_rect(x + 52, y + 2, 1, 20, COLOR_BLACK);
+    draw_rect(x + 27, y + 22, 26, 1, COLOR_BLACK);
+
+    // Color dots
+    draw_rect(x + 30, y + 5, 4, 4, COLOR_RED);
+    draw_rect(x + 38, y + 5, 4, 4, COLOR_APPLE_GREEN);
+    draw_rect(x + 46, y + 5, 4, 4, COLOR_APPLE_BLUE);
+    draw_rect(x + 30, y + 13, 4, 4, COLOR_APPLE_YELLOW);
+    draw_rect(x + 38, y + 13, 4, 4, COLOR_PURPLE);
+
+    draw_icon_label(x, y, label);
+}
+
 void draw_window(Window *win) {
     if (!win->visible) return;
     
@@ -702,8 +727,16 @@ void wm_paint(void) {
             else if (str_starts_with(icon->name, "About")) draw_about_icon(icon->x, icon->y, label);
             else if (str_starts_with(icon->name, "Recycle Bin")) draw_recycle_bin_icon(icon->x, icon->y, label);
             else if (str_starts_with(icon->name, "Explorer")) draw_folder_icon(icon->x, icon->y, label);
+            else if (str_starts_with(icon->name, "Paint")) draw_paint_icon(icon->x, icon->y, label);
             else draw_icon(icon->x, icon->y, label);
-        } else draw_document_icon(icon->x, icon->y, icon->name);
+        } else {
+            if (str_ends_with(icon->name, ".pnt")) draw_paint_icon(icon->x, icon->y, icon->name);
+            else if (str_ends_with(icon->name, ".md")) {
+                draw_document_icon(icon->x, icon->y, icon->name);
+                draw_string(icon->x + 31, icon->y + 2, "MD", COLOR_BLACK);
+            }
+            else draw_document_icon(icon->x, icon->y, icon->name);
+        }
     }
     
     // 3. Windows - sort by z-index and draw
@@ -744,7 +777,7 @@ void wm_paint(void) {
     
     // 6. Start Menu (if open)
     if (start_menu_open) {
-        int menu_h = 230;
+        int menu_h = 250;
         int menu_y = sh - 28 - menu_h;
         draw_bevel_rect(0, menu_y, 120, menu_h, false);
         
@@ -756,20 +789,21 @@ void wm_paint(void) {
         draw_string(8, menu_y + 88, "Calculator", COLOR_BLACK);
         draw_string(8, menu_y + 108, "Minesweeper", COLOR_BLACK);
         draw_string(8, menu_y + 128, "Control Panel", COLOR_BLACK);
-        draw_string(8, menu_y + 148, "About BrewOS", COLOR_BLACK);
+        draw_string(8, menu_y + 148, "Paint", COLOR_BLACK);
+        draw_string(8, menu_y + 168, "About BrewOS", COLOR_BLACK);
         
         // Separator line
-        draw_rect(5, menu_y + 165, 110, 1, COLOR_BLACK);
+        draw_rect(5, menu_y + 185, 110, 1, COLOR_BLACK);
         
         // Power options at bottom
-        draw_string(8, menu_y + 175, "Shutdown", COLOR_BLACK);
-        draw_string(8, menu_y + 195, "Restart", COLOR_BLACK);
+        draw_string(8, menu_y + 195, "Shutdown", COLOR_BLACK);
+        draw_string(8, menu_y + 215, "Restart", COLOR_BLACK);
     }
     
     // Desktop Context Menu
     if (desktop_menu_visible) {
         int menu_w = 140;
-        int menu_h = 100; // 4 items * 25
+        int menu_h = 125; // 5 items * 25
         
         draw_rect(desktop_menu_x, desktop_menu_y, menu_w, menu_h, COLOR_LTGRAY);
         draw_bevel_rect(desktop_menu_x, desktop_menu_y, menu_w, menu_h, true);
@@ -788,6 +822,26 @@ void wm_paint(void) {
         draw_string(desktop_menu_x + 5, desktop_menu_y + 5 + item_h, "Copy", can_cut_copy ? COLOR_BLACK : COLOR_DKGRAY);
         draw_string(desktop_menu_x + 5, desktop_menu_y + 5 + item_h * 2, "Paste", can_paste ? COLOR_BLACK : COLOR_DKGRAY);
         draw_string(desktop_menu_x + 5, desktop_menu_y + 5 + item_h * 3, "Delete", can_cut_copy ? COLOR_RED : COLOR_DKGRAY);
+        draw_string(desktop_menu_x + 5, desktop_menu_y + 5 + item_h * 4, "Rename", can_cut_copy ? COLOR_BLACK : COLOR_DKGRAY);
+    }
+
+    // Desktop Rename Dialog
+    if (desktop_dialog_state == 8) {
+        int dlg_w = 300; int dlg_h = 110;
+        int dlg_x = (sw - dlg_w) / 2;
+        int dlg_y = (sh - dlg_h) / 2;
+        
+        draw_rect(dlg_x - 5, dlg_y - 5, dlg_w + 10, dlg_h + 10, COLOR_LTGRAY);
+        draw_bevel_rect(dlg_x, dlg_y, dlg_w, dlg_h, true);
+        
+        draw_string(dlg_x + 10, dlg_y + 10, "Rename", COLOR_BLACK);
+        draw_bevel_rect(dlg_x + 10, dlg_y + 35, 280, 20, false);
+        draw_string(dlg_x + 15, dlg_y + 40, desktop_dialog_input, COLOR_BLACK);
+        // Cursor
+        draw_rect(dlg_x + 15 + desktop_dialog_cursor * 8, dlg_y + 39, 2, 12, COLOR_BLACK);
+        
+        draw_button(dlg_x + 50, dlg_y + 65, 80, 25, "Rename", false);
+        draw_button(dlg_x + 170, dlg_y + 65, 80, 25, "Cancel", false);
     }
     
     // Message Box
@@ -853,7 +907,7 @@ void wm_handle_click(int x, int y) {
     // Handle Desktop Context Menu Click
     if (desktop_menu_visible) {
         int menu_w = 140;
-        int menu_h = 100;
+        int menu_h = 125;
         if (rect_contains(desktop_menu_x, desktop_menu_y, menu_w, menu_h, x, y)) {
             int rel_y = y - desktop_menu_y;
             int item = rel_y / 25;
@@ -896,10 +950,48 @@ void wm_handle_click(int x, int y) {
                 explorer_delete_recursive(path);
                 refresh_desktop_icons();
             }
+            else if (item == 4 && desktop_menu_target_icon != -1) { // Rename
+                desktop_dialog_state = 8;
+                desktop_dialog_target = desktop_menu_target_icon;
+                int k=0; while(desktop_icons[desktop_dialog_target].name[k]) {
+                    desktop_dialog_input[k] = desktop_icons[desktop_dialog_target].name[k];
+                    k++;
+                }
+                desktop_dialog_input[k] = 0;
+                desktop_dialog_cursor = k;
+            }
         }
         desktop_menu_visible = false;
         force_redraw = true;
         return;
+    }
+
+    // Handle Desktop Dialog Clicks
+    if (desktop_dialog_state == 8) {
+        int dlg_x = (sw - 300) / 2; int dlg_y = (sh - 110) / 2;
+        if (rect_contains(dlg_x + 50, dlg_y + 65, 80, 25, x, y)) { // Rename
+            char old_path[128] = "/Desktop/";
+            char new_path[128] = "/Desktop/";
+            int p=9; int n=0; while(desktop_icons[desktop_dialog_target].name[n]) old_path[p++] = desktop_icons[desktop_dialog_target].name[n++]; old_path[p]=0;
+            p=9; n=0; while(desktop_dialog_input[n]) new_path[p++] = desktop_dialog_input[n++]; new_path[p]=0;
+            
+            if (fat32_rename(old_path, new_path)) refresh_desktop_icons();
+            desktop_dialog_state = 0;
+            force_redraw = true;
+            return;
+        }
+        if (rect_contains(dlg_x + 170, dlg_y + 65, 80, 25, x, y)) { // Cancel
+            desktop_dialog_state = 0;
+            force_redraw = true;
+            return;
+        }
+        if (rect_contains(dlg_x + 10, dlg_y + 35, 280, 20, x, y)) {
+            desktop_dialog_cursor = (x - dlg_x - 15) / 8;
+            int len = 0; while(desktop_dialog_input[len]) len++;
+            if (desktop_dialog_cursor > len) desktop_dialog_cursor = len;
+            force_redraw = true;
+            return;
+        }
     }
     
     // Check Start Button
@@ -953,6 +1045,8 @@ void wm_handle_click(int x, int y) {
                 notepad_reset();
             } else if (topmost == &win_control_panel) {
                 control_panel_reset();
+            } else if (topmost == &win_paint) {
+                paint_reset();
             }
         } else if (y < topmost->y + 24) {
             // Dragging the title bar
@@ -1061,9 +1155,14 @@ void wm_handle_right_click(int x, int y) {
         // Mouse Down
         drag_start_x = mx;
         drag_start_y = my;
+        
+        if (win_paint.focused && win_paint.visible) {
+            paint_reset_last_pos();
+        }
+
         // Check Start Menu for potential drag
         if (start_menu_open) {
-            int menu_h = 230;
+            int menu_h = 250;
             int menu_y = sh - 28 - menu_h;
             if (rect_contains(0, menu_y, 120, menu_h, mx, my)) {
                 if (my < menu_y + 25) start_menu_pending_app = "Explorer";
@@ -1073,8 +1172,9 @@ void wm_handle_right_click(int x, int y) {
                 else if (my < menu_y + 105) start_menu_pending_app = "Calculator";
                 else if (my < menu_y + 125) start_menu_pending_app = "Minesweeper";
                 else if (my < menu_y + 145) start_menu_pending_app = "Control Panel";
-                else if (my < menu_y + 165) start_menu_pending_app = "About";
-                else if (my < menu_y + 185) start_menu_pending_app = "Shutdown";
+                else if (my < menu_y + 165) start_menu_pending_app = "Paint";
+                else if (my < menu_y + 185) start_menu_pending_app = "About";
+                else if (my < menu_y + 205) start_menu_pending_app = "Shutdown";
                 else start_menu_pending_app = "Restart";
             } else {
                 wm_handle_click(mx, my);
@@ -1084,6 +1184,11 @@ void wm_handle_right_click(int x, int y) {
         }
     } else if (right && !prev_right) {
         wm_handle_right_click(mx, my);
+    } else if (left && win_paint.focused && win_paint.visible && !is_dragging) {
+        int rel_x = mx - win_paint.x;
+        int rel_y = my - win_paint.y;
+        paint_handle_mouse(rel_x, rel_y);
+        force_redraw = true;
     } else if (left && is_dragging && drag_window) {
         drag_window->x = mx - drag_offset_x;
         drag_window->y = my - drag_offset_y;
@@ -1164,6 +1269,8 @@ void wm_handle_right_click(int x, int y) {
                 win_minesweeper.visible = true; win_minesweeper.focused = true;
             } else if (str_starts_with(start_menu_pending_app, "Control Panel")) {
                 win_control_panel.visible = true; win_control_panel.focused = true;
+            } else if (str_starts_with(start_menu_pending_app, "Paint")) {
+                win_paint.visible = true; win_paint.focused = true;
             } else if (str_starts_with(start_menu_pending_app, "About")) {
                 win_about.visible = true; win_about.focused = true;
             } else if (str_starts_with(start_menu_pending_app, "Shutdown")) {
@@ -1184,6 +1291,7 @@ void wm_handle_right_click(int x, int y) {
             if (win_calculator.visible && win_calculator.focused) win_calculator.z_index = max_z + 1;
             if (win_minesweeper.visible && win_minesweeper.focused) win_minesweeper.z_index = max_z + 1;
             if (win_control_panel.visible && win_control_panel.focused) win_control_panel.z_index = max_z + 1;
+            if (win_paint.visible && win_paint.focused) win_paint.z_index = max_z + 1;
             if (win_about.visible && win_about.focused) win_about.z_index = max_z + 1;
             
             start_menu_open = false;
@@ -1216,6 +1324,8 @@ void wm_handle_right_click(int x, int y) {
                         explorer_reset();
                     } else if (str_ends_with(icon->name, "Recycle Bin.shortcut")) {
                         explorer_open_directory("/RecycleBin");
+                    } else if (str_ends_with(icon->name, "Paint.shortcut")) {
+                        win_paint.visible = true; win_paint.focused = true;
                     }
                     
                     // Generic Shortcut Handling
@@ -1241,34 +1351,40 @@ void wm_handle_right_click(int x, int y) {
                             }
                         }
                     }
-                    // Bring to front
-                    int max_z = 0;
-                    for (int w = 0; w < window_count; w++) {
-                        if (all_windows[w]->z_index > max_z) max_z = all_windows[w]->z_index;
-                    }
-                    if (win_notepad.visible && win_notepad.focused) win_notepad.z_index = max_z + 1;
-                    if (win_calculator.visible && win_calculator.focused) win_calculator.z_index = max_z + 1;
-                    if (win_minesweeper.visible && win_minesweeper.focused) win_minesweeper.z_index = max_z + 1;
-                    if (win_control_panel.visible && win_control_panel.focused) win_control_panel.z_index = max_z + 1;
-                    if (win_cmd.visible && win_cmd.focused) win_cmd.z_index = max_z + 1;
-                    if (win_about.visible && win_about.focused) win_about.z_index = max_z + 1;
-                    if (win_explorer.visible && win_explorer.focused) win_explorer.z_index = max_z + 1;
                 } else if (icon->type == 1) { // Folder
                     char path[128] = "/Desktop/";
                     int p=9; int n=0; while(icon->name[n]) path[p++] = icon->name[n++]; path[p]=0;
                     explorer_open_directory(path);
-                    
-                    int max_z = 0;
-                    for (int w = 0; w < window_count; w++) {
-                        if (all_windows[w]->z_index > max_z) max_z = all_windows[w]->z_index;
-                    }
-                    win_explorer.z_index = max_z + 1;
                 } else { // File
-                    win_editor.visible = true; win_editor.focused = true;
                     char path[128] = "/Desktop/";
                     int p=9; int n=0; while(icon->name[n]) path[p++] = icon->name[n++]; path[p]=0;
-                    editor_open_file(path);
+                    
+                    if (str_ends_with(icon->name, ".pnt")) {
+                        paint_load(path);
+                    } else if (str_ends_with(icon->name, ".md")) {
+                        win_markdown.visible = true; win_markdown.focused = true;
+                        markdown_open_file(path);
+                    } else {
+                        win_editor.visible = true; win_editor.focused = true;
+                        editor_open_file(path);
+                    }
                 }
+
+                // Bring launched window to front
+                int max_z = 0;
+                for (int w = 0; w < window_count; w++) {
+                    if (all_windows[w]->z_index > max_z) max_z = all_windows[w]->z_index;
+                }
+                if (win_notepad.visible && win_notepad.focused) win_notepad.z_index = max_z + 1;
+                if (win_calculator.visible && win_calculator.focused) win_calculator.z_index = max_z + 1;
+                if (win_minesweeper.visible && win_minesweeper.focused) win_minesweeper.z_index = max_z + 1;
+                if (win_control_panel.visible && win_control_panel.focused) win_control_panel.z_index = max_z + 1;
+                if (win_cmd.visible && win_cmd.focused) win_cmd.z_index = max_z + 1;
+                if (win_paint.visible && win_paint.focused) win_paint.z_index = max_z + 1;
+                if (win_about.visible && win_about.focused) win_about.z_index = max_z + 1;
+                if (win_explorer.visible && win_explorer.focused) win_explorer.z_index = max_z + 1;
+                if (win_editor.visible && win_editor.focused) win_editor.z_index = max_z + 1;
+                if (win_markdown.visible && win_markdown.focused) win_markdown.z_index = max_z + 1;
             }
             pending_desktop_icon_click = -1;
         }
@@ -1425,7 +1541,8 @@ void wm_handle_right_click(int x, int y) {
                                 if (desktop_snap_to_grid) {
                                     int col = (desktop_icons[dragged_idx].x - 20 + 40) / 80;
                                     int row = (desktop_icons[dragged_idx].y - 20 + 40) / 80;
-                                    if (col < 0) col = 0; if (row < 0) row = 0;
+                                    if (col < 0) col = 0;
+                                    if (row < 0) row = 0;
                                     desktop_icons[dragged_idx].x = 20 + col * 80;
                                     desktop_icons[dragged_idx].y = 20 + row * 80;
                                 }
@@ -1480,6 +1597,35 @@ static volatile int key_head = 0;
 static volatile int key_tail = 0;
 
 static void wm_dispatch_key(char c) {
+    if (desktop_dialog_state == 8) {
+        int len = 0; while(desktop_dialog_input[len]) len++;
+        if (c == '\n') {
+            char old_path[128] = "/Desktop/";
+            char new_path[128] = "/Desktop/";
+            int p=9; int n=0; while(desktop_icons[desktop_dialog_target].name[n]) old_path[p++] = desktop_icons[desktop_dialog_target].name[n++]; old_path[p]=0;
+            p=9; n=0; while(desktop_dialog_input[n]) new_path[p++] = desktop_dialog_input[n++]; new_path[p]=0;
+            if (fat32_rename(old_path, new_path)) refresh_desktop_icons();
+            desktop_dialog_state = 0;
+        } else if (c == 27) {
+            desktop_dialog_state = 0;
+        } else if (c == '\b' || c == 127) {
+            if (desktop_dialog_cursor > 0) {
+                for(int i = desktop_dialog_cursor - 1; i < len; i++) desktop_dialog_input[i] = desktop_dialog_input[i+1];
+                desktop_dialog_cursor--;
+            }
+        } else if (c == 19) { // Left
+            if (desktop_dialog_cursor > 0) desktop_dialog_cursor--;
+        } else if (c == 20) { // Right
+            if (desktop_dialog_cursor < len) desktop_dialog_cursor++;
+        } else if (c >= 32 && c <= 126 && len < 63) {
+            for(int i = len; i >= desktop_dialog_cursor; i--) desktop_dialog_input[i+1] = desktop_dialog_input[i];
+            desktop_dialog_input[desktop_dialog_cursor] = c;
+            desktop_dialog_cursor++;
+        }
+        force_redraw = true;
+        return;
+    }
+
     Window *target = NULL;
     if (win_notepad.focused && win_notepad.visible) target = &win_notepad;
     else if (win_cmd.focused && win_cmd.visible) target = &win_cmd;
@@ -1533,6 +1679,7 @@ void wm_init(void) {
     control_panel_init();
     about_init();
     minesweeper_init();
+    paint_init();
     
     refresh_desktop_icons();
     
@@ -1546,6 +1693,7 @@ void wm_init(void) {
     win_control_panel.z_index = 6;
     win_about.z_index = 7;
     win_minesweeper.z_index = 8;
+    win_paint.z_index = 9;
     
     // Register windows in array
     all_windows[0] = &win_notepad;
@@ -1557,7 +1705,8 @@ void wm_init(void) {
     all_windows[6] = &win_control_panel;
     all_windows[7] = &win_about;
     all_windows[8] = &win_minesweeper;
-    window_count = 9;
+    all_windows[9] = &win_paint;
+    window_count = 10;
     
     // Only show Explorer and Notepad on desktop (Explorer on top)
     win_explorer.visible = false;
