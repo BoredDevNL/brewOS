@@ -1,6 +1,7 @@
 #include "net_defs.h"
 #include "cmd.h"
 #include "memory_manager.h"
+#include "wm.h"
 
 static volatile bool ping_reply_received = false;
 static uint16_t ping_id_counter = 0;
@@ -71,16 +72,20 @@ void cli_cmd_ping(char *args) {
         ping_reply_received = false;
         ip_send_packet(dest, IP_PROTO_ICMP, packet, sizeof(packet));
 
-        // Busy wait for reply. Increased timeout to ensure reply is caught.
-        for(volatile int w=0; w<2000000 && !ping_reply_received; w++) {
+
+        uint32_t start_ticks = wm_get_ticks();
+        while (!ping_reply_received && (wm_get_ticks() - start_ticks) < 180) { // 3 seconds timeout
             network_process_frames();
         }
         
         if (!ping_reply_received) {
-            cmd_write("Request timed out.\n");
+            cmd_write("Request timed out. (Did you run 'netinit'?)\n");
         } else if (i < 3) {
             // Wait a bit before next ping
-            for(volatile int w=0; w<500000; w++) network_process_frames();
+            uint32_t wait_start = wm_get_ticks();
+            while ((wm_get_ticks() - wait_start) < 60) {
+                 network_process_frames();
+            }
         }
     }
     is_pinging = false;
