@@ -13,10 +13,10 @@ void play_note(int freq, int duration_ms) {
     }
     
 
-    cli_delay(duration_ms * 300000); 
+    cli_sleep(duration_ms); 
     
     outb(0x61, inb(0x61) & 0xFC);
-    cli_delay(2000000); 
+    cli_sleep(20); 
 }
 
 void cli_cmd_minecraft(char *args) {

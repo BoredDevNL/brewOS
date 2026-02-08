@@ -19,6 +19,7 @@ void cli_putchar(char c);
 
 // Timing utility
 void cli_delay(int iterations);
+void cli_sleep(int ms);
 
 // CLI Command declarations
 void cli_cmd_shutdown(char *args);

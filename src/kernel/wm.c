@@ -1729,6 +1729,10 @@ void wm_init(void) {
     force_redraw = true;
 }
 
+uint32_t wm_get_ticks(void) {
+    return timer_ticks;
+}
+
 // Called by timer interrupt ~60Hz
 void wm_timer_tick(void) {
     timer_ticks++;

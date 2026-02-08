@@ -54,6 +54,7 @@ void wm_refresh(void);
 void wm_paint(void);
 void wm_refresh_desktop(void);
 void wm_timer_tick(void);
+uint32_t wm_get_ticks(void);
 int wm_get_desktop_icon_count(void);
 void wm_show_message(const char *title, const char *message);
 

@@ -1,4 +1,5 @@
 #include "cli_utils.h"
+#include "wm.h"
 
 // Forward declarations - these will be provided by cmd.c
 extern void cmd_putchar(char c);
@@ -76,5 +77,16 @@ void cli_putchar(char c) {
 void cli_delay(int iterations) {
     for (volatile int i = 0; i < iterations; i++) {
         __asm__ __volatile__("nop");
+    }
+}
+
+void cli_sleep(int ms) {
+    // Timer is ~60Hz, so 1 tick = 16.66ms
+    uint32_t ticks = ms / 16;
+    if (ticks == 0 && ms > 0) ticks = 1;
+    
+    uint32_t target = wm_get_ticks() + ticks;
+    while (wm_get_ticks() < target) {
+        __asm__ __volatile__("hlt");
     }
 }
