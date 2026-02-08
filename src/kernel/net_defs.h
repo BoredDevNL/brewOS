@@ -5,7 +5,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-// Ensure we have the IP type from your existing stack
 #include "network.h" 
 
 // Protocol Numbers
@@ -27,7 +26,6 @@ static inline uint32_t ntohl(uint32_t v) {
     return htonl(v);
 }
 
-// Checksum Calculation
 static inline uint16_t net_checksum(void *data, int len) {
     uint32_t sum = 0;
     uint16_t *p = (uint16_t *)data;
@@ -59,7 +57,7 @@ typedef struct {
     uint16_t dst_port;
     uint32_t seq_num;
     uint32_t ack_num;
-    uint8_t  data_offset; // High 4 bits: offset, Low 4 bits: reserved/NS
+    uint8_t  data_offset;
     uint8_t  flags;
     uint16_t window_size;
     uint16_t checksum;

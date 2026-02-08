@@ -888,6 +888,23 @@ bool rect_contains(int x, int y, int w, int h, int px, int py) {
     return px >= x && px < x + w && py >= y && py < y + h;
 }
 
+static void wm_bring_to_front(Window *win) {
+    // Clear focus from all windows
+    for (int i = 0; i < window_count; i++) {
+        all_windows[i]->focused = false;
+    }
+    
+    // Find current max z-index
+    int max_z = 0;
+    for (int i = 0; i < window_count; i++) {
+        if (all_windows[i]->z_index > max_z) max_z = all_windows[i]->z_index;
+    }
+    
+    win->visible = true;
+    win->focused = true;
+    win->z_index = max_z + 1;
+}
+
 void wm_handle_click(int x, int y) {
     int sh = get_screen_height();
     int sw = get_screen_width();
@@ -1020,20 +1037,7 @@ void wm_handle_click(int x, int y) {
     
     // If a window was clicked
     if (topmost != NULL) {
-        // Clear focus from all windows
-        for (int i = 0; i < window_count; i++) {
-            all_windows[i]->focused = false;
-        }
-        
-        // Bring it to front
-        int max_z = 0;
-        for (int i = 0; i < window_count; i++) {
-            if (all_windows[i]->z_index > max_z) {
-                max_z = all_windows[i]->z_index;
-            }
-        }
-        topmost->z_index = max_z + 1;
-        topmost->focused = true;
+        wm_bring_to_front(topmost);
         
         // Check close button
         if (rect_contains(topmost->x + topmost->w - 20, topmost->y + 5, 14, 14, x, y)) {
@@ -1256,43 +1260,28 @@ void wm_handle_right_click(int x, int y) {
         if (start_menu_pending_app) {
             // Launch App
             if (str_starts_with(start_menu_pending_app, "Explorer")) {
-                win_explorer.visible = true; win_explorer.focused = true; explorer_reset();
+                explorer_reset(); wm_bring_to_front(&win_explorer);
             } else if (str_starts_with(start_menu_pending_app, "Notepad")) {
-                win_notepad.visible = true; win_notepad.focused = true;
+                wm_bring_to_front(&win_notepad);
             } else if (str_starts_with(start_menu_pending_app, "Editor")) {
-                win_editor.visible = true; win_editor.focused = true;
+                wm_bring_to_front(&win_editor);
             } else if (str_starts_with(start_menu_pending_app, "Terminal")) {
-                win_cmd.visible = true; win_cmd.focused = true; cmd_reset();
+                cmd_reset(); wm_bring_to_front(&win_cmd);
             } else if (str_starts_with(start_menu_pending_app, "Calculator")) {
-                win_calculator.visible = true; win_calculator.focused = true;
+                wm_bring_to_front(&win_calculator);
             } else if (str_starts_with(start_menu_pending_app, "Minesweeper")) {
-                win_minesweeper.visible = true; win_minesweeper.focused = true;
+                wm_bring_to_front(&win_minesweeper);
             } else if (str_starts_with(start_menu_pending_app, "Control Panel")) {
-                win_control_panel.visible = true; win_control_panel.focused = true;
+                wm_bring_to_front(&win_control_panel);
             } else if (str_starts_with(start_menu_pending_app, "Paint")) {
-                win_paint.visible = true; win_paint.focused = true;
+                wm_bring_to_front(&win_paint);
             } else if (str_starts_with(start_menu_pending_app, "About")) {
-                win_about.visible = true; win_about.focused = true;
+                wm_bring_to_front(&win_about);
             } else if (str_starts_with(start_menu_pending_app, "Shutdown")) {
                 cli_cmd_shutdown(NULL);
             } else if (str_starts_with(start_menu_pending_app, "Restart")) {
                 cli_cmd_reboot(NULL);
             }
-            
-            // Bring launched window to front
-            int max_z = 0;
-            for (int i = 0; i < window_count; i++) {
-                if (all_windows[i]->z_index > max_z) max_z = all_windows[i]->z_index;
-            }
-            if (win_explorer.visible && win_explorer.focused) win_explorer.z_index = max_z + 1;
-            if (win_notepad.visible && win_notepad.focused) win_notepad.z_index = max_z + 1;
-            if (win_editor.visible && win_editor.focused) win_editor.z_index = max_z + 1;
-            if (win_cmd.visible && win_cmd.focused) win_cmd.z_index = max_z + 1;
-            if (win_calculator.visible && win_calculator.focused) win_calculator.z_index = max_z + 1;
-            if (win_minesweeper.visible && win_minesweeper.focused) win_minesweeper.z_index = max_z + 1;
-            if (win_control_panel.visible && win_control_panel.focused) win_control_panel.z_index = max_z + 1;
-            if (win_paint.visible && win_paint.focused) win_paint.z_index = max_z + 1;
-            if (win_about.visible && win_about.focused) win_about.z_index = max_z + 1;
             
             start_menu_open = false;
             start_menu_pending_app = NULL;
@@ -1307,25 +1296,23 @@ void wm_handle_right_click(int x, int y) {
                 if (icon->type == 2) { // App Shortcut
                     // Check name to launch app
                     if (str_ends_with(icon->name, "Notepad.shortcut")) {
-                        win_notepad.visible = true; win_notepad.focused = true;
-                        notepad_reset();
+                        notepad_reset(); wm_bring_to_front(&win_notepad);
                     } else if (str_ends_with(icon->name, "Calculator.shortcut")) {
-                        win_calculator.visible = true; win_calculator.focused = true;
+                        wm_bring_to_front(&win_calculator);
                     } else if (str_ends_with(icon->name, "Minesweeper.shortcut")) {
-                        win_minesweeper.visible = true; win_minesweeper.focused = true;
+                        wm_bring_to_front(&win_minesweeper);
                     } else if (str_ends_with(icon->name, "Control Panel.shortcut")) {
-                        win_control_panel.visible = true; win_control_panel.focused = true;
+                        wm_bring_to_front(&win_control_panel);
                     } else if (str_ends_with(icon->name, "Terminal.shortcut")) {
-                        win_cmd.visible = true; win_cmd.focused = true;
+                        wm_bring_to_front(&win_cmd);
                     } else if (str_ends_with(icon->name, "About.shortcut")) {
-                        win_about.visible = true; win_about.focused = true;
+                        wm_bring_to_front(&win_about);
                     } else if (str_ends_with(icon->name, "Explorer.shortcut")) {
-                        win_explorer.visible = true; win_explorer.focused = true;
-                        explorer_reset();
+                        explorer_reset(); wm_bring_to_front(&win_explorer);
                     } else if (str_ends_with(icon->name, "Recycle Bin.shortcut")) {
-                        explorer_open_directory("/RecycleBin");
+                        explorer_open_directory("/RecycleBin"); wm_bring_to_front(&win_explorer);
                     } else if (str_ends_with(icon->name, "Paint.shortcut")) {
-                        win_paint.visible = true; win_paint.focused = true;
+                        wm_bring_to_front(&win_paint);
                     }
                     
                     // Generic Shortcut Handling
@@ -1342,9 +1329,10 @@ void wm_handle_right_click(int x, int y) {
                                 buf[len] = 0;
                                 if (fat32_is_directory(buf)) {
                                     explorer_open_directory(buf);
+                                    wm_bring_to_front(&win_explorer);
                                 } else {
-                                    win_editor.visible = true; win_editor.focused = true;
                                     editor_open_file(buf);
+                                    wm_bring_to_front(&win_editor);
                                 }
                                 pending_desktop_icon_click = -1;
                                 return;
@@ -1355,36 +1343,22 @@ void wm_handle_right_click(int x, int y) {
                     char path[128] = "/Desktop/";
                     int p=9; int n=0; while(icon->name[n]) path[p++] = icon->name[n++]; path[p]=0;
                     explorer_open_directory(path);
+                    wm_bring_to_front(&win_explorer);
                 } else { // File
                     char path[128] = "/Desktop/";
                     int p=9; int n=0; while(icon->name[n]) path[p++] = icon->name[n++]; path[p]=0;
                     
                     if (str_ends_with(icon->name, ".pnt")) {
                         paint_load(path);
+                        wm_bring_to_front(&win_paint);
                     } else if (str_ends_with(icon->name, ".md")) {
-                        win_markdown.visible = true; win_markdown.focused = true;
                         markdown_open_file(path);
+                        wm_bring_to_front(&win_markdown);
                     } else {
-                        win_editor.visible = true; win_editor.focused = true;
                         editor_open_file(path);
+                        wm_bring_to_front(&win_editor);
                     }
                 }
-
-                // Bring launched window to front
-                int max_z = 0;
-                for (int w = 0; w < window_count; w++) {
-                    if (all_windows[w]->z_index > max_z) max_z = all_windows[w]->z_index;
-                }
-                if (win_notepad.visible && win_notepad.focused) win_notepad.z_index = max_z + 1;
-                if (win_calculator.visible && win_calculator.focused) win_calculator.z_index = max_z + 1;
-                if (win_minesweeper.visible && win_minesweeper.focused) win_minesweeper.z_index = max_z + 1;
-                if (win_control_panel.visible && win_control_panel.focused) win_control_panel.z_index = max_z + 1;
-                if (win_cmd.visible && win_cmd.focused) win_cmd.z_index = max_z + 1;
-                if (win_paint.visible && win_paint.focused) win_paint.z_index = max_z + 1;
-                if (win_about.visible && win_about.focused) win_about.z_index = max_z + 1;
-                if (win_explorer.visible && win_explorer.focused) win_explorer.z_index = max_z + 1;
-                if (win_editor.visible && win_editor.focused) win_editor.z_index = max_z + 1;
-                if (win_markdown.visible && win_markdown.focused) win_markdown.z_index = max_z + 1;
             }
             pending_desktop_icon_click = -1;
         }

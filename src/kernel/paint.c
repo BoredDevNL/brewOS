@@ -13,6 +13,12 @@ static uint32_t *canvas_buffer = NULL;
 static uint32_t current_color = COLOR_BLACK;
 static int last_mx = -1;
 static int last_my = -1;
+static char current_file_path[256] = "/Desktop/drawing.pnt";
+
+static void paint_strcpy(char *dest, const char *src) {
+    while (*src) *dest++ = *src++;
+    *dest = 0;
+}
 
 static void paint_paint(Window *win) {
     // Background
@@ -117,11 +123,12 @@ static void paint_save(const char *path) {
         fat32_write(fh, header, sizeof(header));
         fat32_write(fh, canvas_buffer, CANVAS_W * CANVAS_H * sizeof(uint32_t));
         fat32_close(fh);
-        wm_show_message("Paint", "Image saved to Desktop.");
+        wm_show_message("Paint", "Image saved.");
     }
 }
 
 void paint_load(const char *path) {
+    paint_strcpy(current_file_path, path);
     FAT32_FileHandle *fh = fat32_open(path, "r");
     if (fh) {
         uint32_t header[3];
@@ -145,7 +152,7 @@ static void paint_click(Window *win, int x, int y) {
             return;
         }
         if (y >= win->h - 40 && y < win->h - 20) {
-            paint_save("/Desktop/drawing.pnt");
+            paint_save(current_file_path);
             return;
         }
     }
