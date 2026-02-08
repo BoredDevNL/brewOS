@@ -4,8 +4,8 @@
 void cli_cmd_reboot(char *args) {
     (void)args;
     cli_write("Rebooting...\n");
-    cli_delay(10000000);
-    while ((inb(0x64) & 2) != 0) cli_delay(1000);
+    cli_sleep(100);
+    while ((inb(0x64) & 2) != 0) cli_sleep(1);
     outb(0x64, 0xFE);
     asm volatile ("int $0x3");
 }

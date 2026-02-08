@@ -11,6 +11,6 @@ void cli_cmd_beep(char *args) {
     outb(0x42, (div >> 8) & 0xFF);
     
     outb(0x61, inb(0x61) | 0x03);
-    cli_delay(10000000);
+    cli_sleep(100);
     outb(0x61, inb(0x61) & 0xFC);
 }

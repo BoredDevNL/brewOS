@@ -247,7 +247,7 @@ static void vm_syscall(int id) {
              break;
         }
         case SYS_SLEEP:
-            cli_delay(pop() * 100000);
+            cli_sleep(pop());
             push(0);
             break;
         // File IO - Not supported yet as FILE* cannot be easily passed to VM

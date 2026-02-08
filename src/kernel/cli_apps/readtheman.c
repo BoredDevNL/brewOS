@@ -9,6 +9,6 @@ void cli_cmd_readtheman(char *args) {
     cli_write("Fuck you.\n");
     for(int i=0; i<3; i++) {
         cli_cmd_beep(NULL);
-        cli_delay(1000000);
+        cli_sleep(10);
     }
 }
